@@ -123,7 +123,8 @@ async function addInitialSettings(client) {
         { name: 'notify_clock_in', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาเข้า' },
         { name: 'notify_clock_out', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาออก' },
         { name: 'admin_username', value: 'admin', desc: 'ชื่อผู้ใช้สำหรับแอดมิน' },
-        { name: 'admin_password', value: 'admin123', desc: 'รหัสผ่านสำหรับแอดมิน' }
+        { name: 'admin_password', value: 'admin123', desc: 'รหัสผ่านสำหรับแอดมิน' },
+        { name: 'liff_id', value: $('#liff_id').val() }
       ];
       
       const insertQuery = 'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3)';
