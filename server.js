@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // กำหนดค่า connection string สำหรับ PostgreSQL
 // ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/time_tracker';
+const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_7ryl_user:vr1BkKP7mZqhcbpaKwKIwAn6JT5GuJ7I@dpg-cvr26i6uk2gs73c5u7g0-a.oregon-postgres.render.com/time_tracker_7ryl';
 
 // สร้าง connection pool
 const pool = new Pool({
