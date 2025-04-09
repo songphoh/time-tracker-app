@@ -9,7 +9,8 @@ const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
 });
 
 // ฟังก์ชันสำหรับเช็คการเชื่อมต่อและเตรียมฐานข้อมูล
