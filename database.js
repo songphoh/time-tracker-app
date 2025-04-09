@@ -99,7 +99,7 @@ async function addInitialSettings() {
       
       const settings = [
         { name: 'organization_name', value: 'องค์การบริหารส่วนตำบลหัวนา', desc: 'ชื่อหน่วยงาน' },
-        { name: 'liff_id', value: '2006445603-aO8PqngE', desc: 'LINE LIFF ID' },
+        { name: 'liff_id', value: '2001032478-VR5Akj0k', desc: 'LINE LIFF ID' },
         { name: 'line_notify_token', value: '', desc: 'Token สำหรับ Line Notify' },
         { name: 'work_start_time', value: '08:30', desc: 'เวลาเริ่มงาน' },
         { name: 'work_end_time', value: '16:30', desc: 'เวลาเลิกงาน' },
