@@ -18,7 +18,8 @@ const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
 });
 
 // ทดสอบการเชื่อมต่อ
@@ -30,6 +31,14 @@ pool.query('SELECT NOW()', (err, res) => {
     initializeDatabase();
   }
 });
+
+// ฟังก์ชันสำหรับปรับเวลาให้เป็นเวลาในประเทศไทย (GMT+7)
+function getThaiTime() {
+  const now = new Date();
+  // ปรับเวลาให้เป็นเวลาในประเทศไทย (GMT+7)
+  const thaiTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  return thaiTime.toISOString();
+}
 
 // ฟังก์ชันสร้างตารางและข้อมูลเริ่มต้น
 async function initializeDatabase() {
