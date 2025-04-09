@@ -222,10 +222,16 @@
               <label for="confirm_password" class="form-label">ยืนยันรหัสผ่าน</label>
               <input type="password" class="form-control" id="confirm_password" name="confirm_password">
             </div>
+            
+            <div class="mb-3">
+              <label for="liff_id" class="form-label">LINE LIFF ID</label>
+              <input type="text" class="form-control" id="liff_id" name="liff_id">
+              <div class="form-text">รหัส LIFF ID สำหรับการลงเวลา</div>
+            </div>
           </div>
         </div>
       </div>
-
+      
       <!-- สถานะระบบ -->
       <div class="col-lg-6 col-md-12">
         <div class="card settings-card">
@@ -527,6 +533,7 @@
               $('#allowed_ip').val(settings.allowed_ip || '');
               
               $('#telegram_bot_token').val(settings.telegram_bot_token || '');
+              $('#liff_id').val(settings.liff_id || '');
               
               // สร้าง input hidden สำหรับเก็บข้อมูลกลุ่ม Telegram
               if (!$('#telegram_groups').length) {
