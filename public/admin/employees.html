@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการพนักงาน - ระบบลงเวลาออนไลน์</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="../css/admin-style.css">
+</head>
+<body>
+  <!-- ส่วนหัว -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/admin/dashboard.html">
+        <i class="fas fa-clock me-2"></i> ระบบลงเวลาออนไลน์
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/dashboard.html">
+              <i class="fas fa-tachometer-alt me-1"></i> แดชบอร์ด
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/time-logs.html">
+              <i class="fas fa-clipboard-list me-1"></i> ประวัติการลงเวลา
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="/admin/employees.html">
+              <i class="fas fa-users me-1"></i> จัดการพนักงาน
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/settings.html">
+              <i class="fas fa-cogs me-1"></i> ตั้งค่าระบบ
+            </a>
+          </li>
+        </ul>
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="logout-btn">
+              <i class="fas fa-sign-out-alt me-1"></i> ออกจากระบบ
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- เนื้อหาหลัก -->
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>
+        <i class="fas fa-users text-primary me-2"></i> จัดการพนักงาน
+      </h2>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
+        <i class="fas fa-plus me-1"></i> เพิ่มพนักงาน
+      </button>
+    </div>
+
+    <!-- ตารางพนักงาน -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table id="employeesTable" class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>รหัสพนักงาน</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>ตำแหน่ง</th>
+                <th>แผนก/ฝ่าย</th>
+                <th>สถานะ</th>
+                <th>วันที่สร้าง</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- ข้อมูลจะถูกเพิ่มจาก JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ฟุตเตอร์ -->
+  <footer class="bg-light py-3 mt-5 border-top">
+    <div class="container text-center text-muted small">
+      &copy; <span id="currentYear"></span> ระบบลงเวลาออนไลน์ | พัฒนาโดย องค์การบริหารส่วนตำบลหัวนา
+    </div>
+  </footer>
+  
+  <!-- Modal เพิ่ม/แก้ไขพนักงาน -->
+  <div class="modal fade" id="employeeModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">เพิ่มพนักงาน</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="employeeForm">
+            <input type="hidden" id="employeeId" value="">
+            
+            <div class="mb-3">
+              <label for="empCode" class="form-label">รหัสพนักงาน <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="empCode" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="fullName" class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="fullName" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="position" class="form-label">ตำแหน่ง</label>
+              <input type="text" class="form-control" id="position">
+            </div>
+            
+            <div class="mb-3">
+              <label for="department" class="form-label">แผนก/ฝ่าย</label>
+              <input type="text" class="form-control" id="department">
+            </div>
+            
+            <div class="mb-3">
+              <label for="status" class="form-label">สถานะ</label>
+              <select class="form-select" id="status">
+                <option value="active">ใช้งาน</option>
+                <option value="inactive">ไม่ใช้งาน</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-primary" id="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal ยืนยันการลบ -->
+  <div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">ยืนยันการลบ</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>คุณต้องการลบพนักงาน <span id="deleteEmployeeName" class="fw-bold"></span> ใช่หรือไม่?</p>
+          <p class="text-danger small">หมายเหตุ: การลบพนักงานจะเปลี่ยนสถานะเป็น "ไม่ใช้งาน" แต่ยังคงข้อมูลไว้ในระบบ</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-danger" id="confirmDeleteBtn">ลบ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+  
+  <!-- Custom JS -->
+  <script>
+    $(document).ready(function() {
+      // ตรวจสอบการล็อกอิน
+      if (!sessionStorage.getItem('admin_logged_in')) {
+        window.location.href = '/admin/index.html';
+        return;
+      }
+      
+      // ตั้งค่าปีปัจจุบัน
+      $('#currentYear').text(new Date().getFullYear());
+      
+      // ตั้งค่า DataTable
+      const employeesTable = $('#employeesTable').DataTable({
+        language: {
+          url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/th.json'
+        },
+        columns: [
+          { data: 'emp_code' },
+          { data: 'full_name' },
+          { data: 'position', 
+            render: function(data) {
+              return data || '-';
+            } 
+          },
+          { data: 'department', 
+            render: function(data) {
+              return data || '-';
+            } 
+          },
+          { data: 'status', 
+            render: function(data) {
+              if (data === 'active') {
+                return '<span class="badge bg-success">ใช้งาน</span>';
+              } else {
+                return '<span class="badge bg-secondary">ไม่ใช้งาน</span>';
+              }
+            } 
+          },
+          { data: 'created_at', 
+            render: function(data) {
+              return new Date(data).toLocaleDateString('th-TH');
+            } 
+          },
+          { data: null, 
+            orderable: false,
+            render: function(data) {
+              return '<div class="btn-group" role="group">' +
+                     '<button class="btn btn-sm btn-primary edit-btn" data-id="' + data.id + '">' +
+                     '<i class="fas fa-edit"></i></button>' +
+                     '<button class="btn btn-sm btn-danger delete-btn" data-id="' + data.id + '">' +
+                     '<i class="fas fa-trash"></i></button>' +
+                     '</div>';
+            } 
+          }
+        ]
+      });
+      
+      // โหลดข้อมูลพนักงาน
+      loadEmployees();
+      
+      // เมื่อคลิกปุ่มแก้ไข
+      $('#employeesTable').on('click', '.edit-btn', function() {
+        const id = $(this).data('id');
+        const data = employeesTable.row($(this).closest('tr')).data();
+        
+        // กำหนดข้อมูลในฟอร์ม
+        $('#employeeId').val(data.id);
+        $('#empCode').val(data.emp_code);
+        $('#fullName').val(data.full_name);
+        $('#position').val(data.position || '');
+        $('#department').val(data.department || '');
+        $('#status').val(data.status);
+        
+        // เปลี่ยนหัวข้อ Modal
+        $('#modalTitle').text('แก้ไขพนักงาน');
+        
+        // แสดง Modal
+        const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+        modal.show();
+      });
+      
+      // เมื่อคลิกปุ่มลบ
+      $('#employeesTable').on('click', '.delete-btn', function() {
+        const id = $(this).data('id');
+        const data = employeesTable.row($(this).closest('tr')).data();
+        
+        $('#deleteEmployeeName').text(data.full_name);
+        
+        // เก็บ ID ไว้สำหรับการลบ
+        $('#confirmDeleteBtn').data('id', id);
+        
+        // แสดง Modal
+        const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        modal.show();
+      });
+      
+      // เมื่อคลิกปุ่มยืนยันการลบ
+      $('#confirmDeleteBtn').on('click', function() {
+        const id = $(this).data('id');
+        deleteEmployee(id);
+      });
+      
+      // เมื่อแสดง Modal เพิ่มพนักงาน
+      $('#employeeModal').on('show.bs.modal', function(e) {
+        // ถ้าไม่ได้เรียกจากปุ่มแก้ไข ให้ล้างฟอร์ม
+        if (!$(e.relatedTarget).hasClass('edit-btn')) {
+          resetForm();
+        }
+      });
+      
+      // เมื่อคลิกปุ่มบันทึก
+      $('#saveBtn').on('click', function() {
+        saveEmployee();
+      });
+      
+      // ออกจากระบบ
+      $('#logout-btn').on('click', function(e) {
+        e.preventDefault();
+        sessionStorage.removeItem('admin_logged_in');
+        window.location.href = '/admin/index.html';
+      });
+      
+      // ฟังก์ชันโหลดข้อมูลพนักงาน
+      function loadEmployees() {
+        $.ajax({
+          url: '/api/admin/employees',
+          type: 'GET',
+          success: function(response) {
+            if (response.success) {
+              employeesTable.clear().rows.add(response.employees).draw();
+            } else {
+              alert('เกิดข้อผิดพลาด: ' + response.message);
+            }
+          },
+          error: function() {
+            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+          }
+        });
+      }
+      
+      // ฟังก์ชันบันทึกข้อมูลพนักงาน
+      function saveEmployee() {
+        // ตรวจสอบข้อมูลที่จำเป็น
+        const empCode = $('#empCode').val().trim();
+        const fullName = $('#fullName').val().trim();
+        
+        if (!empCode || !fullName) {
+          alert('กรุณากรอกรหัสและชื่อพนักงาน');
+          return;
+        }
+        
+        // เตรียมข้อมูล
+        const employeeData = {
+          emp_code: empCode,
+          full_name: fullName,
+          position: $('#position').val().trim(),
+          department: $('#department').val().trim(),
+          status: $('#status').val()
+        };
+        
+        const id = $('#employeeId').val();
+        
+        if (id) {
+          // แก้ไขพนักงาน
+          $.ajax({
+            url: '/api/admin/employees/' + id,
+            type: 'PUT',
+            data: JSON.stringify(employeeData),
+            contentType: 'application/json',
+            success: function(response) {
+              if (response.success) {
+                // ซ่อน Modal
+                $('#employeeModal').modal('hide');
+                // โหลดข้อมูลใหม่
+                loadEmployees();
+                alert('บันทึกข้อมูลเรียบร้อย');
+              } else {
+                alert('เกิดข้อผิดพลาด: ' + response.message);
+              }
+            },
+            error: function() {
+              alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            }
+          });
+        } else {
+          // เพิ่มพนักงานใหม่
+          $.ajax({
+            url: '/api/admin/employees',
+            type: 'POST',
+            data: JSON.stringify(employeeData),
+            contentType: 'application/json',
+            success: function(response) {
+              if (response.success) {
+                // ซ่อน Modal
+                $('#employeeModal').modal('hide');
+                // โหลดข้อมูลใหม่
+                loadEmployees();
+                alert('เพิ่มพนักงานเรียบร้อย');
+              } else {
+                alert('เกิดข้อผิดพลาด: ' + response.message);
+              }
+            },
+            error: function() {
+              alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            }
+          });
+        }
+      }
+      
+      // ฟังก์ชันลบพนักงาน
+      function deleteEmployee(id) {
+        $.ajax({
+          url: '/api/admin/employees/' + id,
+          type: 'DELETE',
+          success: function(response) {
+            if (response.success) {
+              // ซ่อน Modal
+              $('#deleteModal').modal('hide');
+              // โหลดข้อมูลใหม่
+              loadEmployees();
+              alert('ลบพนักงานเรียบร้อย');
+            } else {
+              alert('เกิดข้อผิดพลาด: ' + response.message);
+            }
+          },
+          error: function() {
+            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+          }
+        });
+      }
+      
+      // ฟังก์ชันล้างฟอร์ม
+      function resetForm() {
+        $('#employeeId').val('');
+        $('#empCode').val('');
+        $('#fullName').val('');
+        $('#position').val('');
+        $('#department').val('');
+        $('#status').val('active');
+        $('#modalTitle').text('เพิ่มพนักงาน');
+      }
+    });
+  </script>
+</body>
+</html>

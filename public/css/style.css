@@ -1,0 +1,90 @@
+@font-face {
+    font-family: 'Digital dream Fat';
+    src: url('https://semicon.github.io/fonts/DigitaldreamFat.woff2') format('woff2'),
+      url('https://semicon.github.io/fonts/DigitaldreamFat.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  
+  @import url('https://fonts.googleapis.com/css2?family=K2D&family=Kanit&family=Sriracha&display=swap');
+  
+  * {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+    font-family: 'K2D', sans-serif;
+  }
+  
+  body {
+    font-family: 'Kanit', sans-serif;
+    color: #444;
+    background-color: white;
+    padding: 20px;
+    border: 2px solid white;
+    box-shadow: 0px 8px 10px rgba(0, 0, 0, 0.5);
+    font-size: 1.05rem;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background-color: #92a8d1;
+    background: url("https://www.i-pic.info/i/BbiN536436.jpg") no-repeat center center fixed;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+    background-size: cover;
+  }
+  
+  input#employee {
+    font-family: 'Kanit', sans-serif;
+    width: 282px;
+    height: 60px;
+    background-color: brown;
+    color: yellow;
+    margin-block-start: 5px;
+    border-radius: 36px;
+    font-size: 20px;
+  }
+  
+  div#showtxt {
+    font-size: 27px;
+    margin-top: 20px;
+  }
+  
+  .site-logo {
+    content: url("https://www.huana-nbp.go.th/index/add_file/qOv0r0dTue83729.png");
+    display: inline-block;
+    margin-top: 20px;
+    width: auto;
+    height: 100px;
+  }
+  
+  .msgBg {
+    background-color: transparent;
+  }
+  
+  .wrapper {
+    background: rgba(221, 255, 255, 0.7);
+    width: 350px;
+    padding: 20px;
+    border: 1px solid #999;
+    border-radius: 5px;
+    box-shadow: 0px 15px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  /** #### digital clock #### **/
+  .clock {
+    font-family: Digital dream Fat;
+    font-size: 28px;
+    color: #00f6fa;
+    letter-spacing: 3px;
+    text-shadow: 1px 1px 2px teal, 0 0 25px green, 0 0 5px #00fbff;
+    min-width: 98%;
+    background: #444;
+    padding: 5px 0px 5px 10px;
+    display: inline-block;
+    border: 3px solid #ccc;
+    border-radius: 2px;
+    outline-style: solid;
+    outline-color: #999;
+  }
