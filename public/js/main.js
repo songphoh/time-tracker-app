@@ -5,33 +5,6 @@ var owner = 'หน่วยงานราชการ';
 // ตัวแปรสำหรับเก็บข้อมูลโปรไฟล์และพิกัด
 var profile, gps;
 
-// ฟังก์ชันดึงตำแหน่ง GPS (ปรับปรุงใหม่)
-function getlocation() {
-  return new Promise((resolve, reject) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          var lat = position.coords.latitude;
-          var lon = position.coords.longitude;
-          gps = [lat, lon];
-          console.log("🚀 ~ GPS Location:", gps);
-          resolve(gps);
-        },
-        (error) => {
-          console.warn('GPS Error:', error);
-          getLocationFromApi()
-            .then(resolve)
-            .catch(reject);
-        }
-      );
-    } else {
-      getLocationFromApi()
-        .then(resolve)
-        .catch(reject);
-    }
-  });
-}
-
 // เริ่มดึงตำแหน่ง GPS
 $.when(getlocation()).done(function (res) {
   console.log(res);
@@ -39,13 +12,8 @@ $.when(getlocation()).done(function (res) {
 });
 
 // เมื่อโหลดหน้าเสร็จ
-$(document).ready(async function () {
-  try {
-    await getlocation(); // รอให้ GPS พร้อมก่อน
-  } catch (error) {
-    console.error('ไม่สามารถดึงตำแหน่งได้:', error);
-    $('#message').html('ไม่สามารถระบุตำแหน่งได้ กรุณาเปิด GPS');
-  }
+$(document).ready(function () {
+  let profile = null; // ประกาศตัวแปร profile ที่ระดับสูงกว่า
 
   // กำหนดการทำงานของปุ่ม
   $('#clockin').click(() => ClockIn());
@@ -83,12 +51,14 @@ $(document).ready(async function () {
     $.ajax({
       method: "POST",
       url: scripturl + "/getdata",
+      data: {},
       success: function (dataPerson) {
         console.log(dataPerson);
         $(function () {
+          var availableTags = dataPerson;
           $("#employee").autocomplete({
             maxShowItems: 3,
-            source: dataPerson
+            source: availableTags
           });
         });
       }
@@ -104,6 +74,7 @@ function getEmployees() {
   $.ajax({
     method: "POST",
     url: scripturl + "/getemployee",
+    data: {},
     success: function (ar) {
       var employeeSelect = document.getElementById("employee");
 
@@ -114,6 +85,7 @@ function getEmployees() {
 
       ar.forEach(function (item, index) {
         let option = document.createElement("option");
+        var employee = item[0];
         option.value = item[0];
         option.text = item[0];
         employeeSelect.appendChild(option);
@@ -126,26 +98,13 @@ function getEmployees() {
 async function ClockIn() {
   event.preventDefault();
   
-  // ตรวจสอบ GPS
-  if (!gps || gps.length < 2) {
-    $('#message').html('ไม่สามารถระบุตำแหน่งได้ กรุณาเปิด GPS');
-    return;
-  }
-  
   var employee = document.getElementById("employee").value;
   var userinfo = document.getElementById("userinfo").value;
 
   if (employee != '') {
     $('#message').html("<span class='spinner-border spinner-border-sm text-primary'></span> โปรดรอสักครู่ ...!");
+    profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
     
-    // ตรวจสอบ profile
-    let lineProfile = null;
-    try {
-      lineProfile = liff.getDecodedIDToken();
-    } catch (error) {
-      console.error('ไม่สามารถดึง LINE Profile:', error);
-    }
-
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockin",
@@ -154,8 +113,8 @@ async function ClockIn() {
         userinfo,
         lat: gps[0],
         lon: gps[1],
-        line_name: lineProfile ? lineProfile.name : '',
-        line_picture: lineProfile ? lineProfile.picture : ''
+        line_name: profile.name,
+        line_picture: profile.picture
       },
       success: function (res) {
         console.log(res);
@@ -184,9 +143,6 @@ async function ClockIn() {
           document.getElementById("message").className = "alert alert-warning";
           clearForm();
         }
-      },
-      error: function(xhr, status, error) {
-        $('#message').html('เกิดข้อผิดพลาดในการลงเวลา: ' + error);
       }
     });
   } else {
@@ -200,25 +156,12 @@ async function ClockIn() {
 async function ClockOut() {
   event.preventDefault();
   
-  // ตรวจสอบ GPS
-  if (!gps || gps.length < 2) {
-    $('#message').html('ไม่สามารถระบุตำแหน่งได้ กรุณาเปิด GPS');
-    return;
-  }
-  
   var employee = document.getElementById("employee").value;
 
   if (employee != '') {
     $('#message').html("<span class='spinner-border spinner-border-sm text-warning'></span> โปรดรอสักครู่ ...!");
+    profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
     
-    // ตรวจสอบ profile
-    let lineProfile = null;
-    try {
-      lineProfile = liff.getDecodedIDToken();
-    } catch (error) {
-      console.error('ไม่สามารถดึง LINE Profile:', error);
-    }
-
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockout",
@@ -226,8 +169,8 @@ async function ClockOut() {
         employee,
         lat: gps[0],
         lon: gps[1],
-        line_name: lineProfile ? lineProfile.name : '',
-        line_picture: lineProfile ? lineProfile.picture : ''
+        line_name: profile.name,
+        line_picture: profile.picture
       },
       success: function (res) {
         if (res.msg == 'SUCCESS') {
@@ -254,9 +197,6 @@ async function ClockOut() {
           document.getElementById("message").className = "alert alert-warning";
           clearForm();
         }
-      },
-      error: function(xhr, status, error) {
-        $('#message').html('เกิดข้อผิดพลาดในการลงเวลา: ' + error);
       }
     });
   } else {
@@ -266,18 +206,41 @@ async function ClockOut() {
   }
 }
 
-// ฟังก์ชันดึงตำแหน่งจาก API
+// ฟังก์ชันดึงตำแหน่ง GPS
+function getlocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
+  } else {
+    console.log("Geolocation is not supported by this browser.");
+  }
+}
+
+// ฟังก์ชันเมื่อดึงตำแหน่ง GPS สำเร็จ
+function showPosition(position) {
+  var lat = position.coords.latitude;
+  var lon = position.coords.longitude;
+  gps = [lat, lon];
+  console.log("🚀 ~ gps:", gps);
+  console.log("Latitude: " + lat + " Longitude: " + lon);
+}
+
+// ฟังก์ชันดึงตำแหน่งจากพารามิเตอร์ URL
+function getLocationFromParameter() {
+  var url = new URL(window.location.href);
+  var lat = url.searchParams.get("lat");
+  var lon = url.searchParams.get("lon");
+  gps = [lat, lon];
+  console.log("Latitude: " + lat + " Longitude: " + lon);
+}
+
+// ฟังก์ชันดึงตำแหน่งจาก API (กรณีไม่สามารถใช้ Geolocation)
 function getLocationFromApi() {
-  return new Promise((resolve, reject) => {
-    $.getJSON('https://ipapi.co/json/', function (data) {
-      var lat = data.latitude;
-      var lon = data.longitude;
-      gps = [lat, lon];
-      console.log("API Location:", gps);
-      resolve(gps);
-    }).fail(function() {
-      reject('ไม่สามารถดึงตำแหน่งได้');
-    });
+  $.getJSON('https://ipapi.co/json/', function (data) {
+    var lat = data.latitude;
+    var lon = data.longitude;
+    geolocation = [lat, lon];
+    console.log("Latitude: " + lat + " Longitude: " + lon);
+    return geolocation;
   });
 }
 
@@ -293,9 +256,9 @@ function clearForm() {
 // ฟังก์ชันแสดงเวลา
 function showTime() {
   var date = new Date();
-  var h = date.getHours(); 
-  var m = date.getMinutes(); 
-  var s = date.getSeconds(); 
+  var h = date.getHours(); // 0 - 23
+  var m = date.getMinutes(); // 0 - 59
+  var s = date.getSeconds(); // 0 - 59
   var dot = document.textContent = '.';
 
   if (s % 2 == 1) {
