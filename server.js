@@ -8,6 +8,8 @@ const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const debugRouter = require('./debug');
+app.use('/debug', debugRouter);
 
 // กำหนดค่า connection string สำหรับ PostgreSQL
 // ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
@@ -124,7 +126,7 @@ async function addInitialSettings(client) {
         { name: 'notify_clock_out', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาออก' },
         { name: 'admin_username', value: 'admin', desc: 'ชื่อผู้ใช้สำหรับแอดมิน' },
         { name: 'admin_password', value: 'admin123', desc: 'รหัสผ่านสำหรับแอดมิน' },
-        { name: 'liff_id', value: $('#liff_id').val() }
+        { name: 'liff_id', value: '2001032478-VR5Akj0k', desc: 'LINE LIFF ID' }
       ];
       
       const insertQuery = 'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3)';
@@ -924,6 +926,158 @@ app.get('/api/reset-admin', async (req, res) => {
   } catch (error) {
     console.error('Error resetting admin:', error);
     res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ดึง LIFF ID
+app.get('/api/getLiffId', async (req, res) => {
+  console.log('API: getLiffId - ดึง LIFF ID');
+  
+  try {
+    const result = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['liff_id']
+    );
+    
+    if (result.rows.length > 0) {
+      return res.json({ success: true, liffId: result.rows[0].setting_value });
+    } else {
+      // ถ้าไม่พบ LIFF ID ในฐานข้อมูล ให้ใช้ค่าเริ่มต้น
+      return res.json({ success: true, liffId: '2001032478-VR5Akj0k' });
+    }
+  } catch (error) {
+    console.error('Error getting LIFF ID:', error);
+    return res.json({ success: false, error: error.message });
+  }
+});
+
+// API - ทดสอบการลงเวลาเข้า (สำหรับการทดสอบโดยไม่ต้องผ่าน LIFF)
+app.post('/api/test-clockin', async (req, res) => {
+  console.log('API: test-clockin - ทดสอบการลงเวลาเข้า', req.body);
+  
+  try {
+    const { employee, userinfo } = req.body;
+    
+    // ตรวจสอบว่ามีชื่อพนักงาน
+    if (!employee) {
+      return res.json({ msg: 'กรุณาระบุชื่อพนักงาน' });
+    }
+    
+    // ค้นหาพนักงานจากชื่อหรือรหัส
+    const empResult = await pool.query('SELECT id FROM employees WHERE emp_code = $1 OR full_name = $1', [employee]);
+    
+    if (empResult.rows.length === 0) {
+      return res.json({ msg: 'ไม่พบข้อมูลพนักงาน' });
+    }
+    
+    const emp = empResult.rows[0];
+    
+    // ตรวจสอบว่าลงเวลาเข้าซ้ำหรือไม่
+    const today = new Date().toISOString().split('T')[0];
+    
+    const checkExistingResult = await pool.query(
+      'SELECT id FROM time_logs WHERE employee_id = $1 AND DATE(clock_in) = $2',
+      [emp.id, today]
+    );
+    
+    if (checkExistingResult.rows.length > 0) {
+      return res.json({ 
+        msg: 'คุณได้ลงเวลาเข้าแล้ววันนี้', 
+        employee
+      });
+    }
+    
+    // บันทึกเวลาเข้า
+    const now = new Date().toISOString();
+    
+    await pool.query(
+      `INSERT INTO time_logs 
+      (employee_id, clock_in, note, latitude_in, longitude_in)
+      VALUES ($1, $2, $3, $4, $5)`,
+      [emp.id, now, userinfo || null, 13.7563 || null, 100.5018 || null]
+    );
+    
+    const returnDate = new Date().toLocaleTimeString('th-TH');
+    
+    return res.json({
+      msg: 'SUCCESS',
+      employee,
+      return_date: returnDate
+    });
+  } catch (error) {
+    console.error('Error in test clockin:', error);
+    return res.json({ msg: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ทดสอบการลงเวลาออก (สำหรับการทดสอบโดยไม่ต้องผ่าน LIFF)
+app.post('/api/test-clockout', async (req, res) => {
+  console.log('API: test-clockout - ทดสอบการลงเวลาออก', req.body);
+  
+  try {
+    const { employee } = req.body;
+    
+    // ตรวจสอบว่ามีชื่อพนักงาน
+    if (!employee) {
+      return res.json({ msg: 'กรุณาระบุชื่อพนักงาน' });
+    }
+    
+    // ค้นหาพนักงานจากชื่อหรือรหัส
+    const empResult = await pool.query(
+      'SELECT id FROM employees WHERE emp_code = $1 OR full_name = $1',
+      [employee]
+    );
+    
+    if (empResult.rows.length === 0) {
+      return res.json({ msg: 'ไม่พบข้อมูลพนักงาน' });
+    }
+    
+    const emp = empResult.rows[0];
+    
+    // ตรวจสอบว่าลงเวลาเข้าวันนี้หรือไม่
+    const today = new Date().toISOString().split('T')[0];
+    
+    const recordResult = await pool.query(
+      'SELECT id, clock_out FROM time_logs WHERE employee_id = $1 AND DATE(clock_in) = $2 ORDER BY clock_in DESC LIMIT 1',
+      [emp.id, today]
+    );
+    
+    if (recordResult.rows.length === 0) {
+      return res.json({ 
+        msg: 'คุณยังไม่ได้ลงเวลาเข้าวันนี้', 
+        employee
+      });
+    }
+    
+    const record = recordResult.rows[0];
+    
+    if (record.clock_out) {
+      return res.json({ 
+        msg: 'คุณได้ลงเวลาออกแล้ววันนี้', 
+        employee
+      });
+    }
+    
+    // บันทึกเวลาออก
+    const now = new Date().toISOString();
+    
+    await pool.query(
+      `UPDATE time_logs SET 
+      clock_out = $1, latitude_out = $2, longitude_out = $3
+      WHERE id = $4`,
+      [now, 13.7563 || null, 100.5018 || null, record.id]
+    );
+    
+    const returnDate = new Date().toLocaleTimeString('th-TH');
+    
+    return res.json({
+      msg: 'SUCCESS',
+      employee,
+      return_date: returnDate
+    });
+  } catch (error) {
+    console.error('Error in test clockout:', error);
+    return res.json({ msg: 'เกิดข้อผิดพลาด: ' + error.message });
   }
 });
 

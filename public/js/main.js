@@ -19,11 +19,90 @@ $(document).ready(function () {
   $('#clockin').click(() => ClockIn());
   $('#clockout').click(() => ClockOut());
 
-  // เริ่มต้น LINE LIFF
-  liff.init({
-    liffId: '2001032478-VR5Akj0k',
-    withLoginOnExternalBrowser: true
+  // เมื่อโหลดหน้าเสร็จ
+$(document).ready(function () {
+  let profile = null; // ประกาศตัวแปร profile ที่ระดับสูงกว่า
+
+  // กำหนดการทำงานของปุ่ม
+  $('#clockin').click(() => ClockIn());
+  $('#clockout').click(() => ClockOut());
+
+  // ดึง LIFF ID จากฐานข้อมูล
+  $.ajax({
+    method: "GET",
+    url: "/api/getLiffId", // จะต้องสร้าง API นี้เพิ่มในไฟล์ server.js
+    success: function(response) {
+      if (response && response.liffId) {
+        initializeLiff(response.liffId);
+      } else {
+        console.error("ไม่พบ LIFF ID ในฐานข้อมูล");
+        $('#message').html("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ");
+        document.getElementById('message').className = 'alert alert-danger';
+      }
+    },
+    error: function(error) {
+      console.error("เกิดข้อผิดพลาดในการดึง LIFF ID", error);
+      $('#message').html("เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง");
+      document.getElementById('message').className = 'alert alert-danger';
+    }
   });
+
+  function initializeLiff(liffId) {
+    console.log("กำลังเริ่มต้น LIFF ด้วย ID:", liffId);
+    
+    // เริ่มต้น LINE LIFF
+    liff.init({
+      liffId: liffId,
+      withLoginOnExternalBrowser: true
+    }).then(() => {
+      console.log("LIFF initialized successfully");
+      
+      profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
+
+      if (profile) {
+        console.log("🚀 ~ profile:", profile);
+        console.log("User ID (sub): " + profile.sub);
+        console.log("Display Name (name): " + profile.name);
+        console.log("Email: " + (profile.email || "ไม่พบอีเมล"));
+        console.log("Picture URL: " + (profile.picture || "ไม่พบรูปโปรไฟล์"));
+      } else {
+        console.log("โปรไฟล์ยังไม่พร้อมใช้งานหรือไม่มีข้อมูลโปรไฟล์");
+      }
+
+      initApp(); // เรียกฟังก์ชันเริ่มต้นแอป
+    }).catch(err => {
+      console.error("LIFF initialization failed", err);
+      $('#message').html("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ");
+      document.getElementById('message').className = 'alert alert-danger';
+    });
+  }
+
+  // ฟังก์ชันเริ่มต้นแอป
+  function initApp() {
+    document.getElementById('message').innerText = owner;
+    document.getElementById('message').className = 'alert msgBg';
+    
+    // ดึงรายชื่อพนักงานสำหรับ autocomplete
+    $.ajax({
+      method: "POST",
+      url: scripturl + "/getdata",
+      data: {},
+      success: function (dataPerson) {
+        console.log(dataPerson);
+        $(function () {
+          var availableTags = dataPerson;
+          $("#employee").autocomplete({
+            maxShowItems: 3,
+            source: availableTags
+          });
+        });
+      }
+    });
+
+    // ดึงรายชื่อพนักงานสำหรับ dropdown
+    getEmployees();
+  }
+});
 
   // เมื่อ LIFF พร้อมใช้งาน
   liff.ready.then(() => {
