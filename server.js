@@ -1081,6 +1081,200 @@ app.post('/api/test-clockout', async (req, res) => {
   }
 });
 
+// API - ดึงข้อมูลบันทึกเวลาเฉพาะรายการ
+app.get('/api/admin/time-logs/:id', async (req, res) => {
+  console.log('API: admin/time-logs/:id - ดึงข้อมูลการลงเวลาเฉพาะรายการ', req.params);
+  
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT t.id, t.employee_id, e.emp_code, e.full_name, e.position, e.department, 
+             t.clock_in, t.clock_out, t.note, t.status
+      FROM time_logs t
+      JOIN employees e ON t.employee_id = e.id
+      WHERE t.id = $1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลการลงเวลา' });
+    }
+    
+    const log = result.rows[0];
+    
+    res.json({ success: true, log });
+  } catch (error) {
+    console.error('Error getting time log:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - แก้ไขข้อมูลการลงเวลา
+app.put('/api/admin/time-logs/:id', async (req, res) => {
+  console.log('API: admin/time-logs/:id PUT - แก้ไขข้อมูลการลงเวลา', req.params, req.body);
+  
+  try {
+    const { id } = req.params;
+    const { clock_in, clock_out, note } = req.body;
+    
+    // ตรวจสอบว่ามีรายการนี้ในฐานข้อมูลหรือไม่
+    const checkResult = await pool.query('SELECT id FROM time_logs WHERE id = $1', [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลการลงเวลา' });
+    }
+    
+    // แก้ไขข้อมูล
+    const updateQuery = `
+      UPDATE time_logs SET 
+      clock_in = $1, 
+      clock_out = $2, 
+      note = $3
+      WHERE id = $4
+    `;
+    
+    await pool.query(updateQuery, [clock_in, clock_out, note, id]);
+    
+    console.log(`Updated time log ID: ${id}`);
+    res.json({ success: true, message: 'แก้ไขข้อมูลการลงเวลาเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('Error updating time log:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - เพิ่มข้อมูลการลงเวลาใหม่
+app.post('/api/admin/time-logs', async (req, res) => {
+  console.log('API: admin/time-logs POST - เพิ่มข้อมูลการลงเวลาใหม่', req.body);
+  
+  try {
+    const { employee_id, clock_in, clock_out, note, skip_notification } = req.body;
+    
+    if (!employee_id || !clock_in) {
+      return res.json({ success: false, message: 'กรุณาระบุข้อมูลที่จำเป็น' });
+    }
+    
+    // ตรวจสอบว่ามีพนักงานนี้ในระบบหรือไม่
+    const empResult = await pool.query('SELECT id, full_name FROM employees WHERE id = $1', [employee_id]);
+    
+    if (empResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
+    }
+    
+    const employee = empResult.rows[0];
+    
+    // เพิ่มข้อมูลการลงเวลา
+    const insertQuery = `
+      INSERT INTO time_logs (employee_id, clock_in, clock_out, note, status)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `;
+    
+    const result = await pool.query(insertQuery, [
+      employee_id, 
+      clock_in, 
+      clock_out || null, 
+      note || null,
+      'manual' // เพิ่มสถานะ 'manual' เพื่อระบุว่าเป็นการเพิ่มด้วยแอดมิน
+    ]);
+    
+    const newId = result.rows[0].id;
+    
+    // ส่งแจ้งเตือนถ้าไม่ได้ข้ามการแจ้งเตือน
+    if (!skip_notification) {
+      // ดึงการตั้งค่าการแจ้งเตือน
+      const notifySettingResult = await pool.query(
+        'SELECT setting_value FROM settings WHERE setting_name = $1',
+        ['notify_clock_in']
+      );
+      
+      if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
+        // สร้างข้อความสำหรับส่งแจ้งเตือน
+        const clockInDate = new Date(clock_in);
+        const timeStr = clockInDate.toLocaleTimeString('th-TH');
+        let message = `${employee.full_name} ลงเวลาเข้างาน ${timeStr} (บันทึกโดยแอดมิน)`;
+        if (note) {
+          message += `\nหมายเหตุ: ${note}`;
+        }
+        
+        // ส่งแจ้งเตือน
+        await sendTelegramToAllGroups(message, null, null);
+      }
+      
+      // ถ้ามีการลงเวลาออกด้วย
+      if (clock_out) {
+        const notifyOutSettingResult = await pool.query(
+          'SELECT setting_value FROM settings WHERE setting_name = $1',
+          ['notify_clock_out']
+        );
+        
+        if (notifyOutSettingResult.rows.length > 0 && notifyOutSettingResult.rows[0].setting_value === '1') {
+          // สร้างข้อความสำหรับส่งแจ้งเตือน
+          const clockOutDate = new Date(clock_out);
+          const timeStr = clockOutDate.toLocaleTimeString('th-TH');
+          let message = `${employee.full_name} ลงเวลาออกงาน ${timeStr} (บันทึกโดยแอดมิน)`;
+          
+          // ส่งแจ้งเตือน
+          await sendTelegramToAllGroups(message, null, null);
+        }
+      }
+    }
+    
+    console.log(`Added new time log with ID: ${newId}`);
+    res.json({ success: true, message: 'เพิ่มข้อมูลการลงเวลาเรียบร้อยแล้ว', id: newId });
+  } catch (error) {
+    console.error('Error adding time log:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ลบข้อมูลการลงเวลา
+app.delete('/api/admin/time-logs/:id', async (req, res) => {
+  console.log('API: admin/time-logs/:id DELETE - ลบข้อมูลการลงเวลา', req.params);
+  
+  try {
+    const { id } = req.params;
+    
+    // ตรวจสอบว่ามีรายการนี้ในฐานข้อมูลหรือไม่
+    const checkResult = await pool.query('SELECT id FROM time_logs WHERE id = $1', [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลการลงเวลา' });
+    }
+    
+    // ลบข้อมูล
+    await pool.query('DELETE FROM time_logs WHERE id = $1', [id]);
+    
+    console.log(`Deleted time log ID: ${id}`);
+    res.json({ success: true, message: 'ลบข้อมูลการลงเวลาเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('Error deleting time log:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// เพิ่ม API สำหรับดึงค่าชดเชยเวลา
+app.get('/api/getTimeOffset', async (req, res) => {
+  console.log('API: getTimeOffset - ดึงค่าชดเชยเวลา');
+  
+  try {
+    const result = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['time_offset']
+    );
+    
+    if (result.rows.length > 0) {
+      return res.json({ success: true, time_offset: result.rows[0].setting_value });
+    } else {
+      // ถ้าไม่พบค่าชดเชยเวลาในฐานข้อมูล ให้ใช้ค่าเริ่มต้น
+      return res.json({ success: true, time_offset: 0 });
+    }
+  } catch (error) {
+    console.error('Error getting time offset:', error);
+    return res.json({ success: false, error: error.message });
+  }
+});
+
 // เริ่มเซิร์ฟเวอร์
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

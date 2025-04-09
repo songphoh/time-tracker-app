@@ -83,6 +83,11 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="/admin/time-edit.html">
+                <i class="fas fa-edit me-1"></i> แก้ไขการลงเวลา
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link active" href="/admin/settings.html">
                 <i class="fas fa-cogs me-1"></i> ตั้งค่าระบบ
               </a>
@@ -147,6 +152,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="time_offset" class="form-label">ค่าชดเชยเวลา (นาที)</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="time_offset" name="time_offset" value="0">
+          <span class="input-group-text">นาที</span>
+        </div>
+        <div class="form-text">กำหนดค่าชดเชยเวลา: 0 = เวลาปกติ, เป็นบวก = เร็วกว่าความเป็นจริง, เป็นลบ = ช้ากว่าความเป็นจริง</div>
       </div>
 
       <!-- ตั้งค่า Telegram -->
@@ -739,6 +753,7 @@
           { name: 'telegram_groups', value: $('#telegram_groups').val() },
           { name: 'notify_clock_in', value: $('#notify_clock_in').is(':checked') ? '1' : '0' },
           { name: 'notify_clock_out', value: $('#notify_clock_out').is(':checked') ? '1' : '0' },
+          { name: 'time_offset', value: $('#time_offset').val() },
           
           { name: 'admin_username', value: $('#admin_username').val() }
         ];
