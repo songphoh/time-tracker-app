@@ -3,7 +3,8 @@ var scripturl = '/api';
 var owner = 'หน่วยงานราชการ';
 
 // ตัวแปรสำหรับเก็บข้อมูลโปรไฟล์และพิกัด
-var profile, gps;
+var profile = null;
+var gps;
 
 // เริ่มดึงตำแหน่ง GPS
 $.when(getlocation()).done(function (res) {
@@ -13,16 +14,6 @@ $.when(getlocation()).done(function (res) {
 
 // เมื่อโหลดหน้าเสร็จ
 $(document).ready(function () {
-  let profile = null; // ประกาศตัวแปร profile ที่ระดับสูงกว่า
-
-  // กำหนดการทำงานของปุ่ม
-  $('#clockin').click(() => ClockIn());
-  $('#clockout').click(() => ClockOut());
-
-  // เมื่อโหลดหน้าเสร็จ
-$(document).ready(function () {
-  let profile = null; // ประกาศตัวแปร profile ที่ระดับสูงกว่า
-
   // กำหนดการทำงานของปุ่ม
   $('#clockin').click(() => ClockIn());
   $('#clockout').click(() => ClockOut());
@@ -30,7 +21,7 @@ $(document).ready(function () {
   // ดึง LIFF ID จากฐานข้อมูล
   $.ajax({
     method: "GET",
-    url: "/api/getLiffId", // จะต้องสร้าง API นี้เพิ่มในไฟล์ server.js
+    url: "/api/getLiffId",
     success: function(response) {
       if (response && response.liffId) {
         initializeLiff(response.liffId);
@@ -46,107 +37,82 @@ $(document).ready(function () {
       document.getElementById('message').className = 'alert alert-danger';
     }
   });
-
-  function initializeLiff(liffId) {
-    console.log("กำลังเริ่มต้น LIFF ด้วย ID:", liffId);
-    
-    // เริ่มต้น LINE LIFF
-    liff.init({
-      liffId: liffId,
-      withLoginOnExternalBrowser: true
-    }).then(() => {
-      console.log("LIFF initialized successfully");
-      
-      profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
-
-      if (profile) {
-        console.log("🚀 ~ profile:", profile);
-        console.log("User ID (sub): " + profile.sub);
-        console.log("Display Name (name): " + profile.name);
-        console.log("Email: " + (profile.email || "ไม่พบอีเมล"));
-        console.log("Picture URL: " + (profile.picture || "ไม่พบรูปโปรไฟล์"));
-      } else {
-        console.log("โปรไฟล์ยังไม่พร้อมใช้งานหรือไม่มีข้อมูลโปรไฟล์");
-      }
-
-      initApp(); // เรียกฟังก์ชันเริ่มต้นแอป
-    }).catch(err => {
-      console.error("LIFF initialization failed", err);
-      $('#message').html("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ");
-      document.getElementById('message').className = 'alert alert-danger';
-    });
-  }
-
-  // ฟังก์ชันเริ่มต้นแอป
-  function initApp() {
-    document.getElementById('message').innerText = owner;
-    document.getElementById('message').className = 'alert msgBg';
-    
-    // ดึงรายชื่อพนักงานสำหรับ autocomplete
-    $.ajax({
-      method: "POST",
-      url: scripturl + "/getdata",
-      data: {},
-      success: function (dataPerson) {
-        console.log(dataPerson);
-        $(function () {
-          var availableTags = dataPerson;
-          $("#employee").autocomplete({
-            maxShowItems: 3,
-            source: availableTags
-          });
-        });
-      }
-    });
-
-    // ดึงรายชื่อพนักงานสำหรับ dropdown
-    getEmployees();
-  }
 });
 
-  // เมื่อ LIFF พร้อมใช้งาน
-  liff.ready.then(() => {
-    profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
-
-    if (profile) {
-      console.log("🚀 ~ profile:", profile);
-      console.log("User ID (sub): " + profile.sub);
-      console.log("Display Name (name): " + profile.name);
-      console.log("Email: " + (profile.email || "ไม่พบอีเมล"));
-      console.log("Picture URL: " + (profile.picture || "ไม่พบรูปโปรไฟล์"));
-    } else {
-      console.log("โปรไฟล์ยังไม่พร้อมใช้งานหรือไม่มีข้อมูลโปรไฟล์");
+function initializeLiff(liffId) {
+  console.log("กำลังเริ่มต้น LIFF ด้วย ID:", liffId);
+  
+  // เริ่มต้น LINE LIFF
+  liff.init({
+    liffId: liffId,
+    withLoginOnExternalBrowser: true
+  }).then(() => {
+    console.log("LIFF initialized successfully");
+    
+    // ตรวจสอบว่าได้เข้าสู่ระบบแล้วหรือไม่
+    if (!liff.isLoggedIn()) {
+      console.log("User not logged in, triggering login");
+      liff.login();
+      return;
     }
+    
+    // ดึงข้อมูลโปรไฟล์
+    try {
+      // ใช้ liff.getProfile() แทน getDecodedIDToken()
+      liff.getProfile().then(userProfile => {
+        profile = userProfile;
+        console.log("🚀 ~ profile:", profile);
+        console.log("User ID: " + profile.userId);
+        console.log("Display Name: " + profile.displayName);
+        console.log("Picture URL: " + (profile.pictureUrl || "ไม่พบรูปโปรไฟล์"));
+        
+        // เริ่มต้นแอป
+        initApp();
+      }).catch(err => {
+        console.error("Error getting profile:", err);
+        // กรณีไม่สามารถดึงโปรไฟล์ได้ แต่ยังใช้งานต่อได้
+        initApp();
+      });
+    } catch (err) {
+      console.error("Error in profile retrieval:", err);
+      // กรณีเกิดข้อผิดพลาด แต่ยังใช้งานต่อได้
+      initApp();
+    }
+  }).catch(err => {
+    console.error("LIFF initialization failed", err);
+    $('#message').html("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ");
+    document.getElementById('message').className = 'alert alert-danger';
+    
+    // แม้จะมีปัญหากับ LIFF ก็ยังให้ใช้งานแอปได้
+    initApp();
+  });
+}
 
-    initApp(); // เรียกฟังก์ชันเริ่มต้นแอป
+// ฟังก์ชันเริ่มต้นแอป
+function initApp() {
+  document.getElementById('message').innerText = owner;
+  document.getElementById('message').className = 'alert msgBg';
+  
+  // ดึงรายชื่อพนักงานสำหรับ autocomplete
+  $.ajax({
+    method: "POST",
+    url: scripturl + "/getdata",
+    data: {},
+    success: function (dataPerson) {
+      console.log(dataPerson);
+      $(function () {
+        var availableTags = dataPerson;
+        $("#employee").autocomplete({
+          maxShowItems: 3,
+          source: availableTags
+        });
+      });
+    }
   });
 
-  // ฟังก์ชันเริ่มต้นแอป
-  function initApp() {
-    document.getElementById('message').innerText = owner;
-    document.getElementById('message').className = 'alert msgBg';
-    
-    // ดึงรายชื่อพนักงานสำหรับ autocomplete
-    $.ajax({
-      method: "POST",
-      url: scripturl + "/getdata",
-      data: {},
-      success: function (dataPerson) {
-        console.log(dataPerson);
-        $(function () {
-          var availableTags = dataPerson;
-          $("#employee").autocomplete({
-            maxShowItems: 3,
-            source: availableTags
-          });
-        });
-      }
-    });
-
-    // ดึงรายชื่อพนักงานสำหรับ dropdown
-    getEmployees();
-  }
-});
+  // ดึงรายชื่อพนักงานสำหรับ dropdown
+  getEmployees();
+}
 
 // ฟังก์ชันดึงรายชื่อพนักงาน
 function getEmployees() {
@@ -182,33 +148,43 @@ async function ClockIn() {
 
   if (employee != '') {
     $('#message').html("<span class='spinner-border spinner-border-sm text-primary'></span> โปรดรอสักครู่ ...!");
-    profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
+    
+    // ข้อมูลที่จะส่งไปยัง API
+    const apiData = {
+      employee,
+      userinfo,
+      lat: gps ? gps[0] : null,
+      lon: gps ? gps[1] : null
+    };
+    
+    // เพิ่มข้อมูล LINE ถ้ามี profile
+    if (profile) {
+      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
+      apiData.line_name = profile.displayName;
+      apiData.line_picture = profile.pictureUrl;
+    }
     
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockin",
-      data: {
-        employee,
-        userinfo,
-        lat: gps[0],
-        lon: gps[1],
-        line_name: profile.name,
-        line_picture: profile.picture
-      },
+      data: apiData,
       success: function (res) {
         console.log(res);
         
         if (res.msg == 'SUCCESS') {
-          $.ajax({
-            method: 'POST',
-            url: scripturl + "/sendnotify",
-            data: {
-              message: res.message,
-              token: res.token,
-              lat: gps[0],
-              lon: gps[1],
-            }
-          });
+          if (profile) {
+            // ส่งแจ้งเตือนถ้ามี profile
+            $.ajax({
+              method: 'POST',
+              url: scripturl + "/sendnotify",
+              data: {
+                message: res.message,
+                token: res.token,
+                lat: gps ? gps[0] : null,
+                lon: gps ? gps[1] : null,
+              }
+            });
+          }
 
           setTimeout(() => {
             var message = res.employee + '<br> บันทึกเวลามา ' + res.return_date;
@@ -239,30 +215,40 @@ async function ClockOut() {
 
   if (employee != '') {
     $('#message').html("<span class='spinner-border spinner-border-sm text-warning'></span> โปรดรอสักครู่ ...!");
-    profile = liff.getDecodedIDToken(); // ดึงข้อมูลโปรไฟล์
+    
+    // ข้อมูลที่จะส่งไปยัง API
+    const apiData = {
+      employee,
+      lat: gps ? gps[0] : null,
+      lon: gps ? gps[1] : null
+    };
+    
+    // เพิ่มข้อมูล LINE ถ้ามี profile
+    if (profile) {
+      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
+      apiData.line_name = profile.displayName;
+      apiData.line_picture = profile.pictureUrl;
+    }
     
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockout",
-      data: {
-        employee,
-        lat: gps[0],
-        lon: gps[1],
-        line_name: profile.name,
-        line_picture: profile.picture
-      },
+      data: apiData,
       success: function (res) {
         if (res.msg == 'SUCCESS') {
-          $.ajax({
-            method: 'POST',
-            url: scripturl + "/sendnotify",
-            data: {
-              message: res.message,
-              token: res.token,
-              lat: gps[0],
-              lon: gps[1],
-            }
-          });
+          if (profile) {
+            // ส่งแจ้งเตือนถ้ามี profile
+            $.ajax({
+              method: 'POST',
+              url: scripturl + "/sendnotify",
+              data: {
+                message: res.message,
+                token: res.token,
+                lat: gps ? gps[0] : null,
+                lon: gps ? gps[1] : null,
+              }
+            });
+          }
 
           setTimeout(() => {
             var message = res.employee + '<br> บันทึกเวลากลับ ' + res.return_date;
@@ -317,9 +303,9 @@ function getLocationFromApi() {
   $.getJSON('https://ipapi.co/json/', function (data) {
     var lat = data.latitude;
     var lon = data.longitude;
-    geolocation = [lat, lon];
+    gps = [lat, lon];
     console.log("Latitude: " + lat + " Longitude: " + lon);
-    return geolocation;
+    return gps;
   });
 }
 
