@@ -6,6 +6,15 @@ const axios = require('axios');
 const { Pool } = require('pg'); // เปลี่ยนจาก sqlite3 เป็น pg
 const fs = require('fs');
 
+// กำหนดโซนเวลาให้กับเซิร์ฟเวอร์
+process.env.TZ = 'Asia/Bangkok';
+
+// ตรวจสอบโซนเวลาปัจจุบันของเซิร์ฟเวอร์
+console.log('Server Timezone:', process.env.TZ);
+console.log('Current server time:', new Date().toString());
+console.log('Current server time (ISO):', new Date().toISOString());
+console.log('Current server time (Locale):', new Date().toLocaleString('th-TH'));
+
 const app = express();
 const port = process.env.PORT || 3000;
 const debugRouter = require('./debug');
@@ -135,7 +144,8 @@ async function addInitialSettings(client) {
         { name: 'notify_clock_out', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาออก' },
         { name: 'admin_username', value: 'admin', desc: 'ชื่อผู้ใช้สำหรับแอดมิน' },
         { name: 'admin_password', value: 'admin123', desc: 'รหัสผ่านสำหรับแอดมิน' },
-        { name: 'liff_id', value: '2001032478-VR5Akj0k', desc: 'LINE LIFF ID' }
+        { name: 'liff_id', value: '2001032478-VR5Akj0k', desc: 'LINE LIFF ID' },
+        { name: 'time_offset', value: '420', desc: 'ค่าชดเชยเวลา (นาที)' } // เพิ่มค่าชดเชยเวลาเป็นค่าเริ่มต้น
       ];
       
       const insertQuery = 'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3)';
@@ -232,6 +242,7 @@ function adjustClientTime(clientTime) {
       return new Date().toISOString();
     }
     
+    // ไม่ต้องปรับเวลา เนื่องจากเราจะปรับที่การแสดงผลแทน
     return clientDate.toISOString();
   } catch (error) {
     console.error('Error adjusting client time:', error);
@@ -302,7 +313,10 @@ app.post('/api/clockin', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = new Date(now).toLocaleTimeString('th-TH');
+    // ปรับเวลาเป็นเวลาไทย
+    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const returnDate = thaiTime.toLocaleTimeString('th-TH');
+    
     let message = `${employee} ลงเวลาเข้างาน ${returnDate}`;
     if (userinfo) {
       message += `\nหมายเหตุ: ${userinfo}`;
@@ -316,7 +330,8 @@ app.post('/api/clockin', async (req, res) => {
     return res.json({
       msg: 'SUCCESS',
       employee,
-      return_date: returnDate
+      return_date: returnDate,
+      return_date_utc: now // เพิ่มวันที่ในรูปแบบ UTC เพื่อให้ client สามารถแปลงได้
     });
   } catch (error) {
     console.error('Error in clockin:', error);
@@ -397,7 +412,10 @@ app.post('/api/clockout', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = new Date(now).toLocaleTimeString('th-TH');
+    // ปรับเวลาเป็นเวลาไทย
+    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const returnDate = thaiTime.toLocaleTimeString('th-TH');
+    
     let message = `${employee} ลงเวลาออกงาน ${returnDate}`;
     
     // ส่งการแจ้งเตือนถ้าตั้งค่าไว้
@@ -408,7 +426,8 @@ app.post('/api/clockout', async (req, res) => {
     return res.json({
       msg: 'SUCCESS',
       employee,
-      return_date: returnDate
+      return_date: returnDate,
+      return_date_utc: now // เพิ่มวันที่ในรูปแบบ UTC เพื่อให้ client สามารถแปลงได้
     });
   } catch (error) {
     console.error('Error in clockout:', error);
@@ -620,8 +639,9 @@ app.get('/api/admin/time-logs', async (req, res) => {
     
     // ปรับรูปแบบวันที่เวลาให้อ่านง่าย และตรวจสอบค่า null
     const formattedLogs = result.rows.filter(log => log && log.clock_in).map(log => {
-      const clockInDate = new Date(log.clock_in);
-      const clockOutDate = log.clock_out ? new Date(log.clock_out) : null;
+      // ปรับเวลาให้เป็นเวลาไทย
+      const clockInDate = new Date(new Date(log.clock_in).getTime() + (7 * 60 * 60 * 1000));
+      const clockOutDate = log.clock_out ? new Date(new Date(log.clock_out).getTime() + (7 * 60 * 60 * 1000)) : null;
       
       return {
         ...log,
@@ -629,7 +649,7 @@ app.get('/api/admin/time-logs', async (req, res) => {
         clock_in_time: clockInDate.toLocaleTimeString('th-TH'),
         clock_out_date: clockOutDate ? clockOutDate.toLocaleDateString('th-TH') : '',
         clock_out_time: clockOutDate ? clockOutDate.toLocaleTimeString('th-TH') : '',
-        duration: clockOutDate ? calculateDuration(clockInDate, clockOutDate) : ''
+        duration: clockOutDate ? calculateDuration(new Date(log.clock_in), new Date(log.clock_out)) : ''
       };
     });
     
@@ -898,8 +918,9 @@ app.get('/api/admin/dashboard', async (req, res) => {
     
     // ปรับรูปแบบวันที่เวลา และตรวจสอบค่า null
     const formattedLogs = recentLogsResult.rows.filter(log => log && log.clock_in).map(log => {
-      const clockInDate = new Date(log.clock_in);
-      const clockOutDate = log.clock_out ? new Date(log.clock_out) : null;
+      // ปรับเวลาให้เป็นเวลาไทย
+      const clockInDate = new Date(new Date(log.clock_in).getTime() + (7 * 60 * 60 * 1000));
+      const clockOutDate = log.clock_out ? new Date(new Date(log.clock_out).getTime() + (7 * 60 * 60 * 1000)) : null;
       
       return {
         ...log,
@@ -1042,12 +1063,15 @@ app.post('/api/test-clockin', async (req, res) => {
       [emp.id, now, userinfo || null, 13.7563 || null, 100.5018 || null]
     );
     
-    const returnDate = new Date().toLocaleTimeString('th-TH');
+    // ปรับเวลาเป็นเวลาไทย
+    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const returnDate = thaiTime.toLocaleTimeString('th-TH');
     
     return res.json({
       msg: 'SUCCESS',
       employee,
-      return_date: returnDate
+      return_date: returnDate,
+      return_date_utc: now
     });
   } catch (error) {
     console.error('Error in test clockin:', error);
@@ -1113,12 +1137,15 @@ app.post('/api/test-clockout', async (req, res) => {
       [now, 13.7563 || null, 100.5018 || null, record.id]
     );
     
-    const returnDate = new Date().toLocaleTimeString('th-TH');
+    // ปรับเวลาเป็นเวลาไทย
+    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const returnDate = thaiTime.toLocaleTimeString('th-TH');
     
     return res.json({
       msg: 'SUCCESS',
       employee,
-      return_date: returnDate
+      return_date: returnDate,
+      return_date_utc: now
     });
   } catch (error) {
     console.error('Error in test clockout:', error);
@@ -1235,7 +1262,7 @@ app.post('/api/admin/time-logs', async (req, res) => {
       
       if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
         // สร้างข้อความสำหรับส่งแจ้งเตือน
-        const clockInDate = new Date(clock_in);
+        const clockInDate = new Date(new Date(clock_in).getTime() + (7 * 60 * 60 * 1000));
         const timeStr = clockInDate.toLocaleTimeString('th-TH');
         let message = `${employee.full_name} ลงเวลาเข้างาน ${timeStr} (บันทึกโดยแอดมิน)`;
         if (note) {
@@ -1255,7 +1282,7 @@ app.post('/api/admin/time-logs', async (req, res) => {
         
         if (notifyOutSettingResult.rows.length > 0 && notifyOutSettingResult.rows[0].setting_value === '1') {
           // สร้างข้อความสำหรับส่งแจ้งเตือน
-          const clockOutDate = new Date(clock_out);
+          const clockOutDate = new Date(new Date(clock_out).getTime() + (7 * 60 * 60 * 1000));
           const timeStr = clockOutDate.toLocaleTimeString('th-TH');
           let message = `${employee.full_name} ลงเวลาออกงาน ${timeStr} (บันทึกโดยแอดมิน)`;
           
@@ -1312,7 +1339,7 @@ app.get('/api/getTimeOffset', async (req, res) => {
       return res.json({ success: true, time_offset: result.rows[0].setting_value });
     } else {
       // ถ้าไม่พบค่าชดเชยเวลาในฐานข้อมูล ให้ใช้ค่าเริ่มต้น
-      return res.json({ success: true, time_offset: 0 });
+      return res.json({ success: true, time_offset: 420 }); // ตั้งค่าเริ่มต้นเป็น 7 ชั่วโมง (420 นาที)
     }
   } catch (error) {
     console.error('Error getting time offset:', error);
