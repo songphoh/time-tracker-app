@@ -157,33 +157,22 @@ function getClientTime() {
   // สร้างวัตถุเวลาปัจจุบัน
   var currentTime = new Date();
   
-  // ไม่ต้องคำนวณเวลาโซนเพิ่มเติม เพราะเราจะให้เซิร์ฟเวอร์จัดการ
-  var clientTime = new Date(currentTime);
-
-  // ดึงค่าชดเชยเวลาจาก localStorage
-  var timeOffset = localStorage.getItem('time_offset') || 0;
-  timeOffset = parseInt(timeOffset);
-
-  // เพิ่มค่าชดเชยเวลาถ้าจำเป็น
-  if (timeOffset !== 0) {
-    clientTime.setMinutes(clientTime.getMinutes() + timeOffset);
-  }
-
+  // เปลี่ยนเป็นใช้เวลา UTC ตามมาตรฐาน
+  var isoString = currentTime.toISOString();
+ 
   // แสดงข้อมูลการดีบั๊ก
   console.group('Client Time Debugging');
   console.log('Original Time (Local):', currentTime);
-  console.log('Client Time with Offset:', clientTime);
-  console.log('Time Offset:', timeOffset, 'minutes');
+  console.log('Original Time (ISO):', isoString);
   console.log('Timezone Offset:', 
-    -clientTime.getTimezoneOffset(), 
+    -currentTime.getTimezoneOffset(), 
     'minutes (Difference from UTC)'
   );
-  console.log('Final ISO String:', clientTime.toISOString());
   console.groupEnd();
-
-  // คืนค่าเวลาในรูปแบบ ISO string
-  return clientTime.toISOString();
-}
+ 
+  // คืนค่าเวลาในรูปแบบ ISO string (ซึ่งเป็น UTC)
+  return isoString;
+ }
 
 // แก้ไขฟังก์ชัน ClockIn
 async function ClockIn() {
