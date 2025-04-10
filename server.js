@@ -313,7 +313,11 @@ app.post('/api/clockin', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = formatThaiTime(now);
+    const date = new Date(now);
+    const hours = String(date.getUTCHours() + 7).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    const returnDate = `${hours}:${minutes}:${seconds}`;
     
     let message = `${employee} ลงเวลาเข้างาน ${returnDate}`;
     if (userinfo) {
@@ -410,7 +414,11 @@ app.post('/api/clockout', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = formatThaiTime(now);
+    const date = new Date(now);
+    const hours = String(date.getUTCHours() + 7).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    const returnDate = `${hours}:${minutes}:${seconds}`;
     
     let message = `${employee} ลงเวลาออกงาน ${returnDate}`;
     
