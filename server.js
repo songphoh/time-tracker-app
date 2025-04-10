@@ -1064,7 +1064,8 @@ app.post('/api/test-clockin', async (req, res) => {
     );
     
     // ปรับเวลาเป็นเวลาไทย
-    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const utcTime = new Date(now);
+    const thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
     const returnDate = thaiTime.toLocaleTimeString('th-TH');
     
     return res.json({
@@ -1138,7 +1139,8 @@ app.post('/api/test-clockout', async (req, res) => {
     );
     
     // ปรับเวลาเป็นเวลาไทย
-    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
+    const utcTime = new Date(now);
+    const thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
     const returnDate = thaiTime.toLocaleTimeString('th-TH');
     
     return res.json({
