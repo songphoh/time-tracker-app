@@ -313,9 +313,7 @@ app.post('/api/clockin', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    // ปรับเวลาเป็นเวลาไทย
-    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
-    const returnDate = thaiTime.toLocaleTimeString('th-TH');
+    const returnDate = formatThaiTime(now);
     
     let message = `${employee} ลงเวลาเข้างาน ${returnDate}`;
     if (userinfo) {
@@ -412,9 +410,7 @@ app.post('/api/clockout', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    // ปรับเวลาเป็นเวลาไทย
-    const thaiTime = new Date(new Date(now).getTime() + (7 * 60 * 60 * 1000));
-    const returnDate = thaiTime.toLocaleTimeString('th-TH');
+    const returnDate = formatThaiTime(now);
     
     let message = `${employee} ลงเวลาออกงาน ${returnDate}`;
     
