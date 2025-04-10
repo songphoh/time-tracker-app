@@ -174,7 +174,11 @@ function getClientTime() {
   console.log('Original Time (Local):', currentTime);
   console.log('Thai Time:', thaiTime);
   console.log('Time Offset:', timeOffset, 'minutes');
-  console.log('Local Timezone Offset:', currentTime.getTimezoneOffset(), 'minutes');
+  console.log('Timezone Offset:', 
+    -thaiTime.getTimezoneOffset(), 
+    'minutes (Difference from UTC)'
+  );
+  console.log('Final Thai Time (Local):', thaiTime.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
   console.log('Final ISO String:', thaiTime.toISOString());
   console.groupEnd();
 
