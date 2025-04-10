@@ -235,17 +235,8 @@ async function ClockIn() {
           }
 
           setTimeout(() => {
-            // ใช้เวลาที่ได้รับจาก server เพื่อให้แน่ใจว่าแสดงเวลาไทยที่ถูกต้อง
-            var returnDate;
-            if (res.return_date_utc) {
-              // ถ้ามีการส่งเวลา UTC มา ให้แปลงเป็นเวลาท้องถิ่น
-              var utcTime = new Date(res.return_date_utc);
-              var thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
-              returnDate = thaiTime.toLocaleTimeString('th-TH');
-            } else {
-              // ถ้าไม่มี ให้ใช้เวลาที่ server ส่งมาตรงๆ
-              returnDate = res.return_date;
-            }
+            // ใช้ค่า return_date จาก server โดยตรงไม่ต้องแปลงอีก
+            var returnDate = res.return_date;
             
             var message = res.employee + '<br> บันทึกเวลามา ' + returnDate;
             $('#message').html(message);
@@ -335,17 +326,8 @@ async function ClockOut() {
           }
 
           setTimeout(() => {
-            // ใช้เวลาที่ได้รับจาก server เพื่อให้แน่ใจว่าแสดงเวลาไทยที่ถูกต้อง
-            var returnDate;
-            if (res.return_date_utc) {
-              // ถ้ามีการส่งเวลา UTC มา ให้แปลงเป็นเวลาท้องถิ่น
-              var utcTime = new Date(res.return_date_utc);
-              var thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
-              returnDate = thaiTime.toLocaleTimeString('th-TH');
-            } else {
-              // ถ้าไม่มี ให้ใช้เวลาที่ server ส่งมาตรงๆ
-              returnDate = res.return_date;
-            }
+            // ใช้ค่า return_date จาก server โดยตรงไม่ต้องแปลงอีก
+            var returnDate = res.return_date;
             
             var message = res.employee + '<br> บันทึกเวลากลับ ' + returnDate;
             $('#message').html(message);
