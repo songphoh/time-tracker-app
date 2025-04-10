@@ -402,30 +402,27 @@ function clearForm() {
 
 // ฟังก์ชันแสดงเวลาใหม่ที่รองรับการชดเชยเวลา
 function showTime() {
+  // ใช้ Date ใหม่
   var date = new Date();
-  var h = date.getHours(); // 0 - 23
-  var m = date.getMinutes(); // 0 - 59
-  var s = date.getSeconds(); // 0 - 59
-  var dot = '.';
   
   // ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
   var timeOffset = localStorage.getItem('time_offset') || 0;
   timeOffset = parseInt(timeOffset);
   
-  // คำนวณเวลาใหม่ (เพิ่มชั่วโมงและนาที)
-  if (timeOffset !== 0) {
-    var totalMinutes = h * 60 + m + timeOffset;
-    h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
-    m = totalMinutes % 60;
-  }
+  // ปรับเวลาให้เป็นเวลาท้องถิ่นก่อน (UTC+0)
+  var utcHours = date.getUTCHours();
+  var utcMinutes = date.getUTCMinutes();
+  var utcSeconds = date.getUTCSeconds();
+  
+  // คำนวณเวลาไทย (UTC+7) และปรับตามค่าชดเชยเวลา
+  var totalMinutes = (utcHours * 60 + utcMinutes) + 420 + timeOffset; // 420 คือ 7 ชั่วโมงเป็นนาที
+  var h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
+  var m = totalMinutes % 60;
+  var s = utcSeconds;
+  
+  var dot = (s % 2 === 0) ? '\xa0' : '.'; // กระพริบจุดทุกวินาที
 
-  // กำหนดจุดให้กระพริบทุกวินาที
-  if (s % 2 == 1) {
-    dot = '.';
-  } else {
-    dot = '\xa0';
-  }
-
+  // จัดรูปแบบเวลาให้มี 2 หลักเสมอ
   h = h < 10 ? "0" + h : h;
   m = m < 10 ? "0" + m : m;
   s = s < 10 ? "0" + s : s;
