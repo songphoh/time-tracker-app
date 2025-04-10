@@ -152,22 +152,34 @@ function getEmployees() {
   });
 }
 
-// เพิ่มฟังก์ชันนี้ไว้ก่อนฟังก์ชัน ClockIn
+// ฟังก์ชันดึงเวลาไคลเอ็นต์พร้อมดีบั๊ก
 function getClientTime() {
+  // สร้างวัตถุเวลาปัจจุบัน
+  var currentTime = new Date();
+
+  // คำนวณเวลาโซน
+  var thaiTime = new Date(currentTime.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+
   // ดึงค่าชดเชยเวลาจาก localStorage
   var timeOffset = localStorage.getItem('time_offset') || 0;
   timeOffset = parseInt(timeOffset);
 
-  // สร้างวัตถุเวลาปัจจุบัน
-  var currentTime = new Date();
-
   // เพิ่มค่าชดเชยเวลา
   if (timeOffset !== 0) {
-    currentTime.setMinutes(currentTime.getMinutes() + timeOffset);
+    thaiTime.setMinutes(thaiTime.getMinutes() + timeOffset);
   }
 
-  // คืนค่าเวลาในรูปแบบ ISO string เพื่อให้สามารถส่งไปยังเซิร์ฟเวอร์ได้
-  return currentTime.toISOString();
+  // แสดงข้อมูลการดีบั๊ก
+  console.group('Client Time Debugging');
+  console.log('Original Time (Local):', currentTime);
+  console.log('Thai Time:', thaiTime);
+  console.log('Time Offset:', timeOffset, 'minutes');
+  console.log('Local Timezone Offset:', currentTime.getTimezoneOffset(), 'minutes');
+  console.log('Final ISO String:', thaiTime.toISOString());
+  console.groupEnd();
+
+  // คืนค่าเวลาในรูปแบบ ISO string
+  return thaiTime.toISOString();
 }
 
 // แก้ไขฟังก์ชัน ClockIn
@@ -181,12 +193,14 @@ async function ClockIn() {
     $('#message').html("<span class='spinner-border spinner-border-sm text-primary'></span> โปรดรอสักครู่ ...!");
     
     // ข้อมูลที่จะส่งไปยัง API
+    const clientTime = getClientTime(); // เรียกฟังก์ชันดึงเวลา
+    
     const apiData = {
       employee,
       userinfo,
       lat: gps ? gps[0] : null,
       lon: gps ? gps[1] : null,
-      client_time: getClientTime() // เพิ่มเวลาจากไคลเอ็นต์
+      client_time: clientTime // เพิ่มเวลาจากไคลเอ็นต์
     };
     
     // เพิ่มข้อมูล LINE ถ้ามี profile
@@ -195,11 +209,22 @@ async function ClockIn() {
       apiData.line_picture = profile.pictureUrl;
     }
     
+    // เพิ่มการแสดงข้อมูลการส่ง
+    console.group('Clock In Request');
+    console.log('API Data:', apiData);
+    console.log('Sent Client Time:', clientTime);
+    console.groupEnd();
+    
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockin",
       data: apiData,
       success: function (res) {
+        // เพิ่มการแสดงข้อมูลการตอบกลับ
+        console.group('Clock In Response');
+        console.log('Server Response:', res);
+        console.groupEnd();
+        
         console.log(res);
         
         if (res.msg == 'SUCCESS') {
@@ -229,6 +254,15 @@ async function ClockIn() {
           document.getElementById("message").className = "alert alert-warning";
           clearForm();
         }
+      },
+      error: function(xhr, status, error) {
+        // เพิ่มการจัดการข้อผิดพลาด
+        console.error('Clock In Error:', status, error);
+        console.log('Response Text:', xhr.responseText);
+        
+        $('#message').html('เกิดข้อผิดพลาดในการส่งข้อมูล');
+        document.getElementById("message").className = "alert alert-danger";
+        clearForm();
       }
     });
   } else {
@@ -248,11 +282,13 @@ async function ClockOut() {
     $('#message').html("<span class='spinner-border spinner-border-sm text-warning'></span> โปรดรอสักครู่ ...!");
     
     // ข้อมูลที่จะส่งไปยัง API
+    const clientTime = getClientTime(); // เรียกฟังก์ชันดึงเวลา
+    
     const apiData = {
       employee,
       lat: gps ? gps[0] : null,
       lon: gps ? gps[1] : null,
-      client_time: getClientTime() // เพิ่มเวลาจากไคลเอ็นต์
+      client_time: clientTime // เพิ่มเวลาจากไคลเอ็นต์
     };
     
     // เพิ่มข้อมูล LINE ถ้ามี profile
@@ -261,11 +297,24 @@ async function ClockOut() {
       apiData.line_picture = profile.pictureUrl;
     }
     
+    // เพิ่มการแสดงข้อมูลการส่ง
+    console.group('Clock Out Request');
+    console.log('API Data:', apiData);
+    console.log('Sent Client Time:', clientTime);
+    console.groupEnd();
+    
     $.ajax({
       method: 'POST',
       url: scripturl + "/clockout",
       data: apiData,
       success: function (res) {
+        // เพิ่มการแสดงข้อมูลการตอบกลับ
+        console.group('Clock Out Response');
+        console.log('Server Response:', res);
+        console.groupEnd();
+        
+        console.log(res);
+        
         if (res.msg == 'SUCCESS') {
           if (profile) {
             // ส่งแจ้งเตือนถ้ามี profile
@@ -293,6 +342,15 @@ async function ClockOut() {
           document.getElementById("message").className = "alert alert-warning";
           clearForm();
         }
+      },
+      error: function(xhr, status, error) {
+        // เพิ่มการจัดการข้อผิดพลาด
+        console.error('Clock Out Error:', status, error);
+        console.log('Response Text:', xhr.responseText);
+        
+        $('#message').html('เกิดข้อผิดพลาดในการส่งข้อมูล');
+        document.getElementById("message").className = "alert alert-danger";
+        clearForm();
       }
     });
   } else {
@@ -304,85 +362,85 @@ async function ClockOut() {
 
 // ฟังก์ชันดึงตำแหน่ง GPS
 function getlocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
-  } else {
-    console.log("Geolocation is not supported by this browser.");
-  }
+if (navigator.geolocation) {
+navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
+} else {
+console.log("Geolocation is not supported by this browser.");
+}
 }
 
 // ฟังก์ชันเมื่อดึงตำแหน่ง GPS สำเร็จ
 function showPosition(position) {
-  var lat = position.coords.latitude;
-  var lon = position.coords.longitude;
-  gps = [lat, lon];
-  console.log("🚀 ~ gps:", gps);
-  console.log("Latitude: " + lat + " Longitude: " + lon);
+var lat = position.coords.latitude;
+var lon = position.coords.longitude;
+gps = [lat, lon];
+console.log("🚀 ~ gps:", gps);
+console.log("Latitude: " + lat + " Longitude: " + lon);
 }
 
 // ฟังก์ชันดึงตำแหน่งจากพารามิเตอร์ URL
 function getLocationFromParameter() {
-  var url = new URL(window.location.href);
-  var lat = url.searchParams.get("lat");
-  var lon = url.searchParams.get("lon");
-  gps = [lat, lon];
-  console.log("Latitude: " + lat + " Longitude: " + lon);
+var url = new URL(window.location.href);
+var lat = url.searchParams.get("lat");
+var lon = url.searchParams.get("lon");
+gps = [lat, lon];
+console.log("Latitude: " + lat + " Longitude: " + lon);
 }
 
 // ฟังก์ชันดึงตำแหน่งจาก API (กรณีไม่สามารถใช้ Geolocation)
 function getLocationFromApi() {
-  $.getJSON('https://ipapi.co/json/', function (data) {
-    var lat = data.latitude;
-    var lon = data.longitude;
-    gps = [lat, lon];
-    console.log("Latitude: " + lat + " Longitude: " + lon);
-    return gps;
-  });
+$.getJSON('https://ipapi.co/json/', function (data) {
+var lat = data.latitude;
+var lon = data.longitude;
+gps = [lat, lon];
+console.log("Latitude: " + lat + " Longitude: " + lon);
+return gps;
+});
 }
 
 // ฟังก์ชันล้างฟอร์ม
 function clearForm() {
-  setTimeout(function () {
-    document.getElementById('message').innerText = owner;
-    document.getElementById("message").className = "alert msgBg";
-    document.getElementById("myForm").reset();
-  }, 5000);
+setTimeout(function () {
+document.getElementById('message').innerText = owner;
+document.getElementById("message").className = "alert msgBg";
+document.getElementById("myForm").reset();
+}, 5000);
 }
 
 // ฟังก์ชันแสดงเวลาใหม่ที่รองรับการชดเชยเวลา
 function showTime() {
-  var date = new Date();
-  var h = date.getHours(); // 0 - 23
-  var m = date.getMinutes(); // 0 - 59
-  var s = date.getSeconds(); // 0 - 59
-  var dot = document.textContent = '.';
-  
-  // ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
-  var timeOffset = localStorage.getItem('time_offset') || 0;
-  timeOffset = parseInt(timeOffset);
-  
-  // คำนวณเวลาใหม่ (เพิ่มชั่วโมงและนาที)
-  if (timeOffset !== 0) {
-    var totalMinutes = h * 60 + m + timeOffset;
-    h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
-    m = totalMinutes % 60;
-  }
+var date = new Date();
+var h = date.getHours(); // 0 - 23
+var m = date.getMinutes(); // 0 - 59
+var s = date.getSeconds(); // 0 - 59
+var dot = document.textContent = '.';
 
-  if (s % 2 == 1) {
-    dot = document.textContent = '.';
-  } else {
-    dot = document.textContent = '\xa0';
-  }
+// ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
+var timeOffset = localStorage.getItem('time_offset') || 0;
+timeOffset = parseInt(timeOffset);
 
-  h = h < 10 ? "0" + h : h;
-  m = m < 10 ? "0" + m : m;
-  s = s < 10 ? "0" + s : s;
+// คำนวณเวลาใหม่ (เพิ่มชั่วโมงและนาที)
+if (timeOffset !== 0) {
+var totalMinutes = h * 60 + m + timeOffset;
+h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
+m = totalMinutes % 60;
+}
 
-  var time = h + ":" + m + ":" + s + '' + dot;
-  document.getElementById("MyClockDisplay").innerText = time;
-  document.getElementById("MyClockDisplay").textContent = time;
+if (s % 2 == 1) {
+dot = document.textContent = '.';
+} else {
+dot = document.textContent = '\xa0';
+}
 
-  setTimeout(showTime, 1000);
+h = h < 10 ? "0" + h : h;
+m = m < 10 ? "0" + m : m;
+s = s < 10 ? "0" + s : s;
+
+var time = h + ":" + m + ":" + s + '' + dot;
+document.getElementById("MyClockDisplay").innerText = time;
+document.getElementById("MyClockDisplay").textContent = time;
+
+setTimeout(showTime, 1000);
 }
 
 // เริ่มแสดงเวลาเมื่อโหลดหน้า
