@@ -110,19 +110,6 @@ function initApp() {
     }
   });
 
-  // ดึงค่าชดเชยเวลาจากเซิร์ฟเวอร์
-  $.ajax({
-    method: "GET",
-    url: "/api/getTimeOffset",
-    success: function(response) {
-      if (response.success && response.time_offset !== undefined) {
-        // เก็บค่าชดเชยเวลาไว้ใน localStorage
-        localStorage.setItem('time_offset', response.time_offset);
-        console.log("ค่าชดเชยเวลา:", response.time_offset, "นาที");
-      }
-    }
-  });
-
   // ดึงรายชื่อพนักงานสำหรับ dropdown
   getEmployees();
 }
@@ -157,7 +144,7 @@ function getClientTime() {
   // สร้างวัตถุเวลาปัจจุบัน
   var currentTime = new Date();
   
-  // เปลี่ยนเป็นใช้เวลา UTC ตามมาตรฐาน
+  // แปลงเป็นใช้เวลา UTC ตามมาตรฐาน
   var isoString = currentTime.toISOString();
  
   // แสดงข้อมูลการดีบั๊ก
@@ -172,7 +159,7 @@ function getClientTime() {
  
   // คืนค่าเวลาในรูปแบบ ISO string (ซึ่งเป็น UTC)
   return isoString;
- }
+}
 
 // แก้ไขฟังก์ชัน ClockIn
 async function ClockIn() {
@@ -405,28 +392,13 @@ function clearForm() {
   }, 5000);
 }
 
-// ฟังก์ชันแสดงเวลาใหม่ที่รองรับการชดเชยเวลา
+// ฟังก์ชันแสดงเวลา
 function showTime() {
   var date = new Date();
-  var h = date.getHours(); // 0 - 23
+  var h = date.getHours(); // 0 - 23 (เวลาท้องถิ่น)
   var m = date.getMinutes(); // 0 - 59
   var s = date.getSeconds(); // 0 - 59
   var dot = document.textContent = '.';
-
-  // ปรับเวลาให้ตรงโดยใช้ค่าชดเชยเวลา
-  // ไม่ต้องปรับตามโซนเวลา เพราะเวลาที่ได้จาก new Date() เป็นเวลาท้องถิ่นอยู่แล้ว
-  // แต่อาจมีค่าชดเชยเฉพาะกรณีที่ต้องปรับเวลาให้ถูกต้อง
-
-  // ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
-  var timeOffset = localStorage.getItem('time_offset') || 0;
-  timeOffset = parseInt(timeOffset);
-
-  // คำนวณเวลาที่ปรับแล้ว
-  if (timeOffset !== 0) {
-    var totalMinutes = h * 60 + m + timeOffset;
-    h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
-    m = totalMinutes % 60;
-  }
 
   // ควบคุมจุดกระพริบ
   if (s % 2 == 1) {
