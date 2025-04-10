@@ -152,7 +152,25 @@ function getEmployees() {
   });
 }
 
-// ฟังก์ชันลงเวลาเข้า
+// เพิ่มฟังก์ชันนี้ไว้ก่อนฟังก์ชัน ClockIn
+function getClientTime() {
+  // ดึงค่าชดเชยเวลาจาก localStorage
+  var timeOffset = localStorage.getItem('time_offset') || 0;
+  timeOffset = parseInt(timeOffset);
+
+  // สร้างวัตถุเวลาปัจจุบัน
+  var currentTime = new Date();
+
+  // เพิ่มค่าชดเชยเวลา
+  if (timeOffset !== 0) {
+    currentTime.setMinutes(currentTime.getMinutes() + timeOffset);
+  }
+
+  // คืนค่าเวลาในรูปแบบ ISO string เพื่อให้สามารถส่งไปยังเซิร์ฟเวอร์ได้
+  return currentTime.toISOString();
+}
+
+// แก้ไขฟังก์ชัน ClockIn
 async function ClockIn() {
   event.preventDefault();
   
@@ -167,12 +185,12 @@ async function ClockIn() {
       employee,
       userinfo,
       lat: gps ? gps[0] : null,
-      lon: gps ? gps[1] : null
+      lon: gps ? gps[1] : null,
+      client_time: getClientTime() // เพิ่มเวลาจากไคลเอ็นต์
     };
     
     // เพิ่มข้อมูล LINE ถ้ามี profile
     if (profile) {
-      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
       apiData.line_name = profile.displayName;
       apiData.line_picture = profile.pictureUrl;
     }
@@ -220,7 +238,7 @@ async function ClockIn() {
   }
 }
 
-// ฟังก์ชันลงเวลาออก
+// แก้ไขฟังก์ชัน ClockOut
 async function ClockOut() {
   event.preventDefault();
   
@@ -233,12 +251,12 @@ async function ClockOut() {
     const apiData = {
       employee,
       lat: gps ? gps[0] : null,
-      lon: gps ? gps[1] : null
+      lon: gps ? gps[1] : null,
+      client_time: getClientTime() // เพิ่มเวลาจากไคลเอ็นต์
     };
     
     // เพิ่มข้อมูล LINE ถ้ามี profile
     if (profile) {
-      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
       apiData.line_name = profile.displayName;
       apiData.line_picture = profile.pictureUrl;
     }
