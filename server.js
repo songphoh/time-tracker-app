@@ -221,12 +221,39 @@ app.post('/api/getemployee', async (req, res) => {
   }
 });
 
+// ฟังก์ชันปรับเวลาที่ได้รับจากไคลเอ็นต์
+function adjustClientTime(clientTime) {
+  try {
+    // แปลงเวลาจาก client เป็นวัตถุ Date
+    const clientDate = new Date(clientTime);
+    
+    // ถ้าเวลาไม่ถูกต้อง ให้ใช้เวลาของเซิร์ฟเวอร์
+    if (isNaN(clientDate.getTime())) {
+      return new Date().toISOString();
+    }
+    
+    return clientDate.toISOString();
+  } catch (error) {
+    console.error('Error adjusting client time:', error);
+    // กรณีเกิดข้อผิดพลาด ให้ใช้เวลาของเซิร์ฟเวอร์
+    return new Date().toISOString();
+  }
+}
+
 // API - บันทึกเวลาเข้า
 app.post('/api/clockin', async (req, res) => {
   console.log('API: clockin - บันทึกเวลาเข้า', req.body);
   
   try {
-    const { employee, userinfo, lat, lon, line_name, line_picture } = req.body;
+    const { 
+      employee, 
+      userinfo, 
+      lat, 
+      lon, 
+      line_name, 
+      line_picture, 
+      client_time 
+    } = req.body;
     
     // ตรวจสอบว่ามีชื่อพนักงาน
     if (!employee) {
@@ -257,9 +284,10 @@ app.post('/api/clockin', async (req, res) => {
       });
     }
     
-    // บันทึกเวลาเข้า
-    const now = new Date().toISOString();
+    // ใช้เวลาจาก client หากส่งมา มิฉะนั้นใช้เวลาของเซิร์ฟเวอร์
+    const now = client_time ? adjustClientTime(client_time) : new Date().toISOString();
     
+    // บันทึกเวลาเข้า
     await pool.query(
       `INSERT INTO time_logs 
       (employee_id, clock_in, note, latitude_in, longitude_in, line_name, line_picture)
@@ -274,7 +302,7 @@ app.post('/api/clockin', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = new Date().toLocaleTimeString('th-TH');
+    const returnDate = new Date(now).toLocaleTimeString('th-TH');
     let message = `${employee} ลงเวลาเข้างาน ${returnDate}`;
     if (userinfo) {
       message += `\nหมายเหตุ: ${userinfo}`;
@@ -301,7 +329,14 @@ app.post('/api/clockout', async (req, res) => {
   console.log('API: clockout - บันทึกเวลาออก', req.body);
   
   try {
-    const { employee, lat, lon, line_name, line_picture } = req.body;
+    const { 
+      employee, 
+      lat, 
+      lon, 
+      line_name, 
+      line_picture, 
+      client_time 
+    } = req.body;
     
     // ตรวจสอบว่ามีชื่อพนักงาน
     if (!employee) {
@@ -344,9 +379,10 @@ app.post('/api/clockout', async (req, res) => {
       });
     }
     
-    // บันทึกเวลาออก
-    const now = new Date().toISOString();
+    // ใช้เวลาจาก client หากส่งมา มิฉะนั้นใช้เวลาของเซิร์ฟเวอร์
+    const now = client_time ? adjustClientTime(client_time) : new Date().toISOString();
     
+    // บันทึกเวลาออก
     await pool.query(
       `UPDATE time_logs SET 
       clock_out = $1, latitude_out = $2, longitude_out = $3, line_name = $4, line_picture = $5
@@ -361,7 +397,7 @@ app.post('/api/clockout', async (req, res) => {
     );
     
     // สร้างข้อความสำหรับส่งแจ้งเตือน
-    const returnDate = new Date().toLocaleTimeString('th-TH');
+    const returnDate = new Date(now).toLocaleTimeString('th-TH');
     let message = `${employee} ลงเวลาออกงาน ${returnDate}`;
     
     // ส่งการแจ้งเตือนถ้าตั้งค่าไว้
