@@ -1,364 +1,455 @@
-@font-face {
-  font-family: 'Digital dream Fat';
-  src: url('https://semicon.github.io/fonts/DigitaldreamFat.woff2') format('woff2'),
-    url('https://semicon.github.io/fonts/DigitaldreamFat.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+// กำหนด URL ของ API
+var scripturl = '/api';
+var owner = 'หน่วยงานราชการ';
+
+// ตัวแปรสำหรับเก็บข้อมูลโปรไฟล์และพิกัด
+var profile = null;
+var gps;
+
+// เริ่มดึงตำแหน่ง GPS
+$.when(getlocation()).done(function (res) {
+  console.log(res);
+  console.log(gps);
+});
+
+// เมื่อโหลดหน้าเสร็จ
+$(document).ready(function () {
+  // กำหนดการทำงานของปุ่ม
+  $('#clockin').click(() => ClockIn());
+  $('#clockout').click(() => ClockOut());
+
+  // เพิ่ม event listener สำหรับการกดปุ่ม Enter ในช่อง input
+  $('#employee').keypress(function(e) {
+    if(e.which == 13) {
+      e.preventDefault();
+      ClockIn();
+    }
+  });
+
+  // ดึง LIFF ID จากฐานข้อมูล
+  $.ajax({
+    method: "GET",
+    url: "/api/getLiffId",
+    success: function(response) {
+      if (response && response.liffId) {
+        initializeLiff(response.liffId);
+      } else {
+        console.error("ไม่พบ LIFF ID ในฐานข้อมูล");
+        showMessage("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ", "danger");
+      }
+    },
+    error: function(error) {
+      console.error("เกิดข้อผิดพลาดในการดึง LIFF ID", error);
+      showMessage("เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง", "danger");
+    }
+  });
+});
+
+// ฟังก์ชันแสดงข้อความในกล่องแจ้งเตือน
+function showMessage(text, type = "primary") {
+  const message = document.getElementById('message');
+  message.innerHTML = text;
+  message.className = `alert alert-${type}`;
+  message.classList.remove('d-none');
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500&family=K2D&family=Kanit&family=Sriracha&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Prompt', sans-serif;
+// ฟังก์ชันแสดง Loading
+function showLoading(text = "โปรดรอสักครู่...") {
+  showMessage(`<div class="d-flex align-items-center">
+    <div class="spinner-border spinner-border-sm me-2" role="status">
+      <span class="visually-hidden">กำลังโหลด...</span>
+    </div>
+    <span>${text}</span>
+  </div>`, "info");
 }
 
-body {
-  color: #333;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-  overflow-x: hidden;
+function initializeLiff(liffId) {
+  console.log("กำลังเริ่มต้น LIFF ด้วย ID:", liffId);
+  
+  // เริ่มต้น LINE LIFF
+  liff.init({
+    liffId: liffId,
+    withLoginOnExternalBrowser: true
+  }).then(() => {
+    console.log("LIFF initialized successfully");
+    
+    // ตรวจสอบว่าได้เข้าสู่ระบบแล้วหรือไม่
+    if (!liff.isLoggedIn()) {
+      console.log("User not logged in, triggering login");
+      liff.login();
+      return;
+    }
+    
+    // ดึงข้อมูลโปรไฟล์
+    try {
+      // ใช้ liff.getProfile() แทน getDecodedIDToken()
+      liff.getProfile().then(userProfile => {
+        profile = userProfile;
+        console.log("🚀 ~ profile:", profile);
+        console.log("User ID: " + profile.userId);
+        console.log("Display Name: " + profile.displayName);
+        console.log("Picture URL: " + (profile.pictureUrl || "ไม่พบรูปโปรไฟล์"));
+        
+        // เริ่มต้นแอป
+        initApp();
+      }).catch(err => {
+        console.error("Error getting profile:", err);
+        // กรณีไม่สามารถดึงโปรไฟล์ได้ แต่ยังใช้งานต่อได้
+        initApp();
+      });
+    } catch (err) {
+      console.error("Error in profile retrieval:", err);
+      // กรณีเกิดข้อผิดพลาด แต่ยังใช้งานต่อได้
+      initApp();
+    }
+  }).catch(err => {
+    console.error("LIFF initialization failed", err);
+    showMessage("ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาติดต่อผู้ดูแลระบบ", "danger");
+    
+    // แม้จะมีปัญหากับ LIFF ก็ยังให้ใช้งานแอปได้
+    initApp();
+  });
 }
 
-.container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-}
+// ฟังก์ชันเริ่มต้นแอป
+function initApp() {
+  showMessage(owner, "msgBg");
+  
+  // ดึงรายชื่อพนักงานสำหรับ autocomplete
+  $.ajax({
+    method: "POST",
+    url: scripturl + "/getdata",
+    data: {},
+    success: function (dataPerson) {
+      console.log(dataPerson);
+      $(function () {
+        var availableTags = dataPerson;
+        $("#employee").autocomplete({
+          maxShowItems: 3,
+          source: availableTags,
+          autoFocus: true,
+          delay: 300,
+          minLength: 1,
+          select: function(event, ui) {
+            // ปรับแต่งการแสดงผลเมื่อเลือก
+            setTimeout(() => {
+              $(this).blur();
+              $("#userinfo").focus();
+            }, 100);
+          }
+        }).autocomplete("instance")._renderItem = function(ul, item) {
+          // ปรับแต่งการแสดงผลในรายการ autocomplete
+          return $("<li>")
+            .append("<div class='autocomplete-item'>" + item.label + "</div>")
+            .appendTo(ul);
+        };
+      });
+    }
+  });
 
-.wrapper {
-  background: rgba(255, 255, 255, 0.85);
-  width: 100%;
-  max-width: 500px;
-  min-width: 280px;
-  padding: clamp(20px, 4vw, 30px) clamp(15px, 3vw, 25px);
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-}
+  // ดึงค่าชดเชยเวลาจากเซิร์ฟเวอร์
+  $.ajax({
+    method: "GET",
+    url: "/api/getTimeOffset",
+    success: function(response) {
+      if (response.success && response.time_offset !== undefined) {
+        // เก็บค่าชดเชยเวลาไว้ใน localStorage
+        localStorage.setItem('time_offset', response.time_offset);
+        console.log("ค่าชดเชยเวลา:", response.time_offset, "นาที");
+        
+        // เริ่มแสดงเวลาใหม่ทันทีหลังจากที่ได้รับค่าชดเชยเวลา
+        showTime();
+      }
+    }
+  });
 
-.app-title {
-  color: #4a148c;
-  margin-bottom: 15px;
-  font-weight: 500;
-  font-size: clamp(1.2rem, 3vw, 1.5rem);
-  text-align: center;
-}
-
-.site-logo {
-  content: url("https://github.com/songphoh/time-tracker-app/blob/main/images/logo_v1.png?raw=true");
-  display: block;
-  margin: 10px auto;
-  width: auto;
-  height: clamp(80px, 15vw, 100px);
-  max-width: 100%;
-  object-fit: contain;
-}
-
-.clock-container {
-  margin: 20px 0;
-  text-align: center;
-}
-
-/** #### digital clock #### **/
-.clock {
-  font-family: 'Digital dream Fat', monospace;
-  font-size: clamp(1.5rem, 5vw, 28px);
-  color: #00c9ff;
-  letter-spacing: clamp(1px, 1vw, 3px);
-  text-shadow: 0 0 10px rgba(0, 249, 255, 0.5);
-  background: #2c3e50;
-  padding: clamp(8px, 2vw, 10px) clamp(3px, 1vw, 5px);
-  display: inline-block;
-  border: none;
-  border-radius: 8px;
-  width: 100%;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-  text-align: center;
-}
-
-/* Form Elements */
-.form-label {
-  color: #4a148c;
-  font-weight: 500;
-  margin-bottom: 8px;
-  font-size: clamp(0.85rem, 2.5vw, 1rem);
-  display: block;
-}
-
-input#employee {
-  font-family: 'Kanit', sans-serif;
-  height: clamp(40px, 8vw, 50px);
-  background-color: #1a237e;
-  color: #ffeb3b;
-  border-radius: 8px;
-  font-size: clamp(0.9rem, 3vw, 18px);
-  margin-bottom: 0;
-  border: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  padding: 12px;
-  text-align: center;
-}
-
-.form-control {
-  border-radius: 8px;
-  padding: clamp(8px, 2vw, 12px);
-  font-size: clamp(0.85rem, 2.5vw, 16px);
-  border: 1px solid #ddd;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-  width: 100%;
-}
-
-.form-control:focus {
-  border-color: #7c4dff;
-  box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.25);
-  outline: none;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 16px -5px 0 -5px;
-}
-
-.col {
-  flex: 1 0 0%;
-  padding: 0 5px;
-}
-
-.col-6 {
-  flex: 0 0 auto;
-  width: 50%;
-  padding: 0 5px;
-}
-
-/* Buttons */
-.btn {
-  font-weight: 500;
-  padding: clamp(10px, 2vw, 14px);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  font-size: clamp(0.85rem, 2.5vw, 1rem);
-  border: none;
-  cursor: pointer;
-  display: inline-block;
-  text-align: center;
-  text-decoration: none;
-  width: 100%;
-}
-
-.btn-primary {
-  background: linear-gradient(45deg, #3949ab, #1e88e5);
-  border: none;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(45deg, #303f9f, #1976d2);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
-
-.btn-warning {
-  background: linear-gradient(45deg, #ff9800, #ff5722);
-  border: none;
-  color: white;
-}
-
-.btn-warning:hover {
-  background: linear-gradient(45deg, #f57c00, #e64a19);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* Button Animation */
-.btn-animate {
-  animation: buttonPulse 0.5s ease;
-}
-
-@keyframes buttonPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.95); }
-  100% { transform: scale(1); }
-}
-
-/* Alert Message */
-.alert {
-  border-radius: 8px;
-  padding: clamp(10px, 2vw, 14px);
-  margin-top: 15px;
-  background-color: #f8f9fa;
-  border-left: 4px solid #4a148c;
-  min-height: 50px;
-  font-size: clamp(0.85rem, 2.5vw, 1rem);
-  word-wrap: break-word;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* Alert variations */
-.alert-success {
-  border-left-color: #28a745;
-  background-color: rgba(40, 167, 69, 0.1);
-}
-
-.alert-warning {
-  border-left-color: #ffc107;
-  background-color: rgba(255, 193, 7, 0.1);
-}
-
-.alert-danger {
-  border-left-color: #dc3545;
-  background-color: rgba(220, 53, 69, 0.1);
-}
-
-.alert-info {
-  border-left-color: #17a2b8;
-  background-color: rgba(23, 162, 184, 0.1);
-}
-
-.msgBg {
-  border-left-color: #4a148c;
-  background-color: rgba(74, 20, 140, 0.05);
-}
-
-/* Autocomplete Styling */
-.ui-autocomplete {
-  max-height: 200px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  z-index: 9999;
-  border-radius: 8px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-  border: 1px solid #ddd;
-  background: white;
-  font-family: 'Kanit', sans-serif;
-  padding: 5px;
-}
-
-.ui-menu-item {
-  padding: 0;
-  margin: 0;
-}
-
-.autocomplete-item {
-  padding: 10px 12px;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: all 0.2s ease;
-  margin: 2px 0;
-}
-
-.ui-state-focus .autocomplete-item,
-.ui-state-active .autocomplete-item {
-  background-color: #7c4dff !important;
-  color: white !important;
-  border: none !important;
-  margin: 2px 0 !important;
-}
-
-/* Icons */
-.fas, .fa {
-  margin-right: 5px;
-}
-
-.form-group {
-  margin-bottom: 0;
-}
-
-/* Responsive Media Queries */
-@media (min-width: 400px) {
-  .wrapper {
-    min-width: 350px;
+  // ดึงรายชื่อพนักงานสำหรับ dropdown
+  getEmployees();
+  
+  // แสดงชื่อผู้ใช้ LINE ถ้ามี
+  if (profile && profile.displayName) {
+    const welcomeText = `ยินดีต้อนรับ: ${profile.displayName}`;
+    showMessage(welcomeText, "success");
+    
+    // ซ่อนข้อความต้อนรับหลังจาก 3 วินาที
+    setTimeout(() => {
+      showMessage(owner, "msgBg");
+    }, 3000);
   }
 }
 
-@media (min-width: 576px) {
-  .wrapper {
-    min-width: 400px;
-    padding: 35px 30px;
+// ฟังก์ชันดึงรายชื่อพนักงาน
+function getEmployees() {
+  $.ajax({
+    method: "POST",
+    url: scripturl + "/getemployee",
+    data: {},
+    success: function (ar) {
+      var employeeSelect = document.getElementById("employee");
+
+      let option = document.createElement("option");
+      option.value = "";
+      option.text = "";
+      employeeSelect.appendChild(option);
+
+      ar.forEach(function (item, index) {
+        let option = document.createElement("option");
+        var employee = item[0];
+        option.value = item[0];
+        option.text = item[0];
+        employeeSelect.appendChild(option);
+      });
+    }
+  });
+}
+
+// ฟังก์ชันลงเวลาเข้า
+async function ClockIn() {
+  event.preventDefault();
+  
+  var employee = document.getElementById("employee").value;
+  var userinfo = document.getElementById("userinfo").value;
+
+  if (employee != '') {
+    showLoading("กำลังบันทึกเวลาเข้า...");
+    
+    // เพิ่มเอฟเฟกต์ที่ปุ่ม
+    animateButton('#clockin');
+    
+    // ข้อมูลที่จะส่งไปยัง API
+    const apiData = {
+      employee,
+      userinfo,
+      lat: gps ? gps[0] : null,
+      lon: gps ? gps[1] : null
+    };
+    
+    // เพิ่มข้อมูล LINE ถ้ามี profile
+    if (profile) {
+      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
+      apiData.line_name = profile.displayName;
+      apiData.line_picture = profile.pictureUrl;
+    }
+    
+    $.ajax({
+      method: 'POST',
+      url: scripturl + "/clockin",
+      data: apiData,
+      success: function (res) {
+        console.log(res);
+        
+        if (res.msg == 'SUCCESS') {
+          if (profile) {
+            // ส่งแจ้งเตือนถ้ามี profile
+            $.ajax({
+              method: 'POST',
+              url: scripturl + "/sendnotify",
+              data: {
+                message: res.message,
+                token: res.token,
+                lat: gps ? gps[0] : null,
+                lon: gps ? gps[1] : null,
+              }
+            });
+          }
+
+          setTimeout(() => {
+            var message = `<i class="fas fa-check-circle me-2"></i>${res.employee}<br>บันทึกเวลามา ${res.return_date}`;
+            showMessage(message, "success");
+            clearForm();
+          }, 500);
+        } else {
+          var message = `<i class="fas fa-exclamation-triangle me-2"></i>${res.employee} ${res.msg}`;
+          showMessage(message, "warning");
+          clearForm();
+        }
+      },
+      error: function(err) {
+        showMessage(`<i class="fas fa-times-circle me-2"></i>เกิดข้อผิดพลาดในการบันทึกข้อมูล`, "danger");
+        clearForm();
+      }
+    });
+  } else {
+    showMessage('<i class="fas fa-exclamation-circle me-2"></i>กรุณาเลือกรายชื่อพนักงาน', "warning");
+    // Focus ไปที่ช่องกรอกชื่อพนักงาน
+    $('#employee').focus();
+  }
+}
+
+// ฟังก์ชันลงเวลาออก
+async function ClockOut() {
+  event.preventDefault();
+  
+  var employee = document.getElementById("employee").value;
+
+  if (employee != '') {
+    showLoading("กำลังบันทึกเวลาออก...");
+    
+    // เพิ่มเอฟเฟกต์ที่ปุ่ม
+    animateButton('#clockout');
+    
+    // ข้อมูลที่จะส่งไปยัง API
+    const apiData = {
+      employee,
+      lat: gps ? gps[0] : null,
+      lon: gps ? gps[1] : null
+    };
+    
+    // เพิ่มข้อมูล LINE ถ้ามี profile
+    if (profile) {
+      // ใช้ค่าตามโครงสร้างของ liff.getProfile()
+      apiData.line_name = profile.displayName;
+      apiData.line_picture = profile.pictureUrl;
+    }
+    
+    $.ajax({
+      method: 'POST',
+      url: scripturl + "/clockout",
+      data: apiData,
+      success: function (res) {
+        if (res.msg == 'SUCCESS') {
+          if (profile) {
+            // ส่งแจ้งเตือนถ้ามี profile
+            $.ajax({
+              method: 'POST',
+              url: scripturl + "/sendnotify",
+              data: {
+                message: res.message,
+                token: res.token,
+                lat: gps ? gps[0] : null,
+                lon: gps ? gps[1] : null,
+              }
+            });
+          }
+
+          setTimeout(() => {
+            var message = `<i class="fas fa-check-circle me-2"></i>${res.employee}<br>บันทึกเวลากลับ ${res.return_date}`;
+            showMessage(message, "success");
+            clearForm();
+          }, 500);
+        } else {
+          var message = `<i class="fas fa-exclamation-triangle me-2"></i>${res.employee} ${res.msg}`;
+          showMessage(message, "warning");
+          clearForm();
+        }
+      },
+      error: function(err) {
+        showMessage(`<i class="fas fa-times-circle me-2"></i>เกิดข้อผิดพลาดในการบันทึกข้อมูล`, "danger");
+        clearForm();
+      }
+    });
+  } else {
+    showMessage('<i class="fas fa-exclamation-circle me-2"></i>กรุณาเลือกรายชื่อพนักงาน', "warning");
+    // Focus ไปที่ช่องกรอกชื่อพนักงาน
+    $('#employee').focus();
+  }
+}
+
+// ฟังก์ชันสร้างเอฟเฟกต์ animation สำหรับปุ่ม
+function animateButton(buttonSelector) {
+  const button = $(buttonSelector);
+  button.addClass('btn-animate');
+  
+  // นำคลาส animation ออกหลังจาก 500ms
+  setTimeout(() => {
+    button.removeClass('btn-animate');
+  }, 500);
+}
+
+// ฟังก์ชันดึงตำแหน่ง GPS
+function getlocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
+  } else {
+    console.log("Geolocation is not supported by this browser.");
+  }
+}
+
+// ฟังก์ชันเมื่อดึงตำแหน่ง GPS สำเร็จ
+function showPosition(position) {
+  var lat = position.coords.latitude;
+  var lon = position.coords.longitude;
+  gps = [lat, lon];
+  console.log("🚀 ~ gps:", gps);
+  console.log("Latitude: " + lat + " Longitude: " + lon);
+}
+
+// ฟังก์ชันดึงตำแหน่งจากพารามิเตอร์ URL
+function getLocationFromParameter() {
+  var url = new URL(window.location.href);
+  var lat = url.searchParams.get("lat");
+  var lon = url.searchParams.get("lon");
+  gps = [lat, lon];
+  console.log("Latitude: " + lat + " Longitude: " + lon);
+}
+
+// ฟังก์ชันดึงตำแหน่งจาก API (กรณีไม่สามารถใช้ Geolocation)
+function getLocationFromApi() {
+  $.getJSON('https://ipapi.co/json/', function (data) {
+    var lat = data.latitude;
+    var lon = data.longitude;
+    gps = [lat, lon];
+    console.log("Latitude: " + lat + " Longitude: " + lon);
+    return gps;
+  });
+}
+
+// ฟังก์ชันล้างฟอร์ม
+function clearForm() {
+  setTimeout(function () {
+    showMessage(owner, "msgBg");
+    document.getElementById("myForm").reset();
+    $('#employee').focus();
+  }, 5000);
+}
+
+// ฟังก์ชันแสดงเวลาใหม่ที่รองรับการชดเชยเวลา
+function showTime() {
+  // ใช้ Date ใหม่
+  var date = new Date();
+  
+  // ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
+  var timeOffset = localStorage.getItem('time_offset') || 0;
+  timeOffset = parseInt(timeOffset);
+  
+  // ตรวจสอบว่าค่าชดเชยเวลาเป็นตัวเลขหรือไม่
+  if (isNaN(timeOffset)) {
+    timeOffset = 0;
   }
   
-  .row {
-    margin-top: 20px;
+  // ปรับเวลาให้เป็นเวลาท้องถิ่นก่อน (UTC+0)
+  var utcHours = date.getUTCHours();
+  var utcMinutes = date.getUTCMinutes();
+  var utcSeconds = date.getUTCSeconds();
+  
+  // คำนวณเวลาไทย (UTC+7) และปรับตามค่าชดเชยเวลา
+  // 420 คือ 7 ชั่วโมงเป็นนาที (ไทย GMT+7)
+  var totalMinutes = (utcHours * 60 + utcMinutes) + 420 + parseInt(timeOffset); 
+  var h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
+  var m = totalMinutes % 60;
+  var s = utcSeconds;
+  
+  var dot = (s % 2 === 0) ? '\xa0' : '.'; // กระพริบจุดทุกวินาที
+
+  // จัดรูปแบบเวลาให้มี 2 หลักเสมอ
+  h = h < 10 ? "0" + h : h;
+  m = m < 10 ? "0" + m : m;
+  s = s < 10 ? "0" + s : s;
+
+  var time = h + ":" + m + ":" + s + dot;
+  
+  // กำหนดให้ element ที่มี id เป็น MyClockDisplay แสดงเวลา
+  var clockDisplay = document.getElementById("MyClockDisplay");
+  if (clockDisplay) {
+    clockDisplay.innerText = time;
+    clockDisplay.textContent = time;
   }
+
+  setTimeout(showTime, 1000);
 }
 
-@media (min-width: 768px) {
-  .wrapper {
-    min-width: 450px;
-    max-width: 600px;
-    padding: 40px 35px;
-  }
-  
-  .row {
-    margin-top: 24px;
-  }
-  
-  .clock {
-    font-size: 24px;
-  }
-}
-
-@media (min-width: 992px) {
-  .wrapper {
-    min-width: 500px;
-    max-width: 650px;
-    padding: 45px 40px;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
-  }
-  
-  .site-logo {
-    height: 100px;
-  }
-  
-  .clock {
-    font-size: 28px;
-  }
-  
-  .btn {
-    padding: 14px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .wrapper {
-    min-width: 550px;
-    max-width: 700px;
-    padding: 50px 45px;
-  }
-  
-  .row {
-    margin-top: 28px;
-  }
-}
-
-@media (min-width: 1400px) {
-  .wrapper {
-    min-width: 600px;
-    max-width: 750px;
-    padding: 55px 50px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-  }
-  
-  .app-title {
-    font-size: 1.5rem;
-  }
-  
-  .form-label {
-    font-size: 1rem;
-  }
+// เริ่มแสดงเวลาเมื่อโหลดหน้า เฉพาะกรณีที่ยังไม่ได้ดึงค่าชดเชยเวลา
+// โดยทั่วไปเราจะเรียก showTime() หลังจากดึงค่าชดเชยเวลาเรียบร้อยแล้ว
+if (!localStorage.getItem('time_offset')) {
+  showTime();
 }
