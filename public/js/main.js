@@ -156,6 +156,9 @@ function initApp() {
         // เก็บค่าชดเชยเวลาไว้ใน localStorage
         localStorage.setItem('time_offset', response.time_offset);
         console.log("ค่าชดเชยเวลา:", response.time_offset, "นาที");
+        
+        // เริ่มแสดงเวลาใหม่ทันทีหลังจากที่ได้รับค่าชดเชยเวลา
+        showTime();
       }
     }
   });
@@ -409,13 +412,19 @@ function showTime() {
   var timeOffset = localStorage.getItem('time_offset') || 0;
   timeOffset = parseInt(timeOffset);
   
+  // ตรวจสอบว่าค่าชดเชยเวลาเป็นตัวเลขหรือไม่
+  if (isNaN(timeOffset)) {
+    timeOffset = 0;
+  }
+  
   // ปรับเวลาให้เป็นเวลาท้องถิ่นก่อน (UTC+0)
   var utcHours = date.getUTCHours();
   var utcMinutes = date.getUTCMinutes();
   var utcSeconds = date.getUTCSeconds();
   
   // คำนวณเวลาไทย (UTC+7) และปรับตามค่าชดเชยเวลา
-  var totalMinutes = (utcHours * 60 + utcMinutes) + 420 + timeOffset; // 420 คือ 7 ชั่วโมงเป็นนาที
+  // 420 คือ 7 ชั่วโมงเป็นนาที (ไทย GMT+7)
+  var totalMinutes = (utcHours * 60 + utcMinutes) + 420 + parseInt(timeOffset); 
   var h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
   var m = totalMinutes % 60;
   var s = utcSeconds;
@@ -439,5 +448,8 @@ function showTime() {
   setTimeout(showTime, 1000);
 }
 
-// เริ่มแสดงเวลาเมื่อโหลดหน้า
-showTime();
+// เริ่มแสดงเวลาเมื่อโหลดหน้า เฉพาะกรณีที่ยังไม่ได้ดึงค่าชดเชยเวลา
+// โดยทั่วไปเราจะเรียก showTime() หลังจากดึงค่าชดเชยเวลาเรียบร้อยแล้ว
+if (!localStorage.getItem('time_offset')) {
+  showTime();
+}
