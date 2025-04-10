@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบลงเวลาออนไลน์ หน่วยงาน</title>
   <link rel="icon" href="https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
@@ -17,32 +15,30 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/jquery-ui.autocomplete.scroll@0.1.9/jquery.ui.autocomplete.scroll.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery-ui.autocomplete.scroll@0.1.9/jquery.ui.autocomplete.scroll.min.js"></script>
 </head>
-
 <body>
   <div class="container">
-    <div class="wrapper text-center">
-      <div class="site-logo text-center"></div>
+    <div class="wrapper">
+      <div class="site-logo"></div>
       <h4 class="app-title">ระบบลงเวลาออนไลน์ หน่วยงาน</h4>
 
       <div class="clock-container">
-        <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
+        <span id="MyClockDisplay" class="clock" onload="showTime()"></span>
       </div>
 
       <form id="myForm">
-        <div class="row mt-4">
+        <div class="row">
           <div class="form-group col">
-            <label for="employee" class="form-label"><i class="fas fa-user"></i> พิมพ์ชื่อหรือรหัส</label>
-            <input id="employee" class="form-control text-center"> <br>
+            <label for="employee" class="form-label"><i>👤</i> พิมพ์ชื่อหรือรหัส</label>
+            <input id="employee" class="form-control" placeholder="พิมพ์ชื่อหรือรหัสพนักงาน">
           </div>
         </div>
 
-        <div class="row mt-2">
+        <div class="row">
           <div class="form-group col">
-            <label for="userinfo" class="form-label"><i class="fas fa-book-reader"></i> หมายเหตุ: ประชุม/กิจกรรม อื่นๆ</label>
-            <input type="search" class="form-control" id="userinfo" name="userinfo" list="list">
+            <label for="userinfo" class="form-label"><i>📝</i> หมายเหตุ: ประชุม/กิจกรรม อื่นๆ</label>
+            <input type="search" class="form-control" id="userinfo" name="userinfo" placeholder="เลือกหรือพิมพ์หมายเหตุ" list="list">
             <datalist id="list">
               <option value="ไปราชการ">ไปราชการ</option>
               <option value="ลากิจ">ลากิจ</option>
@@ -52,22 +48,22 @@
           </div>
         </div>
 
-        <div class="row mt-4 g-2">
+        <div class="row">
           <div class="col-6">
-            <button id="clockin" type="button" class="btn btn-primary w-100">
-              <i class="fas fa-sign-in-alt"></i> Clock In
+            <button id="clockin" type="button" class="btn btn-primary">
+              <i>➡️</i> Clock In
             </button>
           </div>
           <div class="col-6">
-            <button id="clockout" type="button" class="btn btn-warning w-100">
-              <i class="fas fa-sign-out-alt"></i> Clock Out
+            <button id="clockout" type="button" class="btn btn-warning">
+              <i>⬅️</i> Clock Out
             </button>
           </div>
         </div>
 
-        <div class="row mt-4">
+        <div class="row">
           <div class="form-group col">
-            <div class="alert" role="alert" id="message"></div>
+            <div class="alert msgBg" role="alert" id="message">รอข้อความแจ้ง...</div>
           </div>
         </div>
       </form>
@@ -80,5 +76,4 @@
   <!-- เรียกใช้ไฟล์ JavaScript ของเรา -->
   <script src="js/main.js"></script>
 </body>
-
 </html>
