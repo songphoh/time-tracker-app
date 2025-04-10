@@ -1,81 +1,126 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบลงเวลาออนไลน์ หน่วยงาน</title>
-  <link rel="icon"https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-  <!-- เรียกใช้ไฟล์ CSS ของเรา -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#7964e3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ระบบลงเวลาออนไลน์ | หน่วยงาน</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="css/style.css">
-
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
-  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/jquery-ui.autocomplete.scroll@0.1.9/jquery.ui.autocomplete.scroll.min.js"></script>
 </head>
 
 <body>
-  <div class="wrapper text-center" style="max-width:350px">
-    <div class="site-logo text-center"></div>
-    <h5>ระบบลงเวลาออนไลน์ หน่วยงาน</h5>
-
-    <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
-
-    <form id="myForm">
-
-      <form id="myForm">
-        <div class="row">
-          <div class="form-group col">
-            <label for="employee" class="form-label"><i>👤</i> พิมพ์ชื่อหรือรหัส</label>
-            <input id="employee" class="form-control" placeholder="พิมพ์ชื่อหรือรหัสพนักงาน">
+  <div class="container">
+    <div class="card">
+        <div class="header">
+            <div class="site-logo">
+              <!-- แทนที่ด้วยโลโก้ขององค์กรคุณ -->
+              <img src="https://github.com/songphoh/time-tracker-app/blob/main/images/logo_v1.png?raw=true" alt="องค์การบริหารส่วนตำบลข่าใหญ่">
+            </div>
+            <h1 class="title">ระบบลงเวลาออนไลน์</h1>
+            <div class="subtitle">องค์การบริหารส่วนตำบลข่าใหญ่</div>
           </div>
-        </div>
-
-        <div class="row">
-          <div class="form-group col">
-            <label for="userinfo" class="form-label"><i>📝</i> หมายเหตุ: ประชุม/กิจกรรม อื่นๆ</label>
-            <input type="search" class="form-control" id="userinfo" name="userinfo" placeholder="เลือกหรือพิมพ์หมายเหตุ" list="list">
-            <datalist id="list">
-              <option value="ไปราชการ">ไปราชการ</option>
-              <option value="ลากิจ">ลากิจ</option>
-              <option value="ลาป่วย">ลาป่วย</option>
-              <option value="ลาคลอด">ลาคลอด</option>
-            </datalist>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col-6">
-            <button id="clockin" type="button" class="btn btn-primary">
-              <i>➡️</i> Clock In
-            </button>
-          </div>
-          <div class="col-6">
-            <button id="clockout" type="button" class="btn btn-warning">
-              <i>⬅️</i> Clock Out
-            </button>
-          </div>
-        </div>
-
-      <div class="row mt-4">
-        <div class="form-group col">
-          <div class="alert" role="alert" id="message"></div>
-        </div>
+      
+      <div class="clock-container">
+        <div id="MyClockDisplay" class="clock"></div>
+        <div id="DateDisplay" class="date-display"></div>
       </div>
-
-    </form>
+      
+      <form id="myForm">
+        <div class="form-group">
+          <label for="employee" class="form-label">
+            <i class="fas fa-user"></i> พิมพ์ชื่อหรือรหัสพนักงาน
+          </label>
+          <input type="text" id="employee" class="form-control" placeholder="พิมพ์ชื่อหรือรหัสพนักงาน" autocomplete="off" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="userinfo" class="form-label">
+            <i class="fas fa-clipboard-list"></i> หมายเหตุ (ถ้ามี)
+          </label>
+          <input type="search" id="userinfo" class="form-control" placeholder="เลือกหรือพิมพ์หมายเหตุ" list="list" autocomplete="off">
+          <datalist id="list">
+            <option value="ประชุม/อบรม">ประชุม/อบรม</option>
+            <option value="ไปราชการ">ไปราชการ</option>
+            <option value="ลากิจ">ลากิจ</option>
+            <option value="ลาป่วย">ลาป่วย</option>
+            <option value="ลาคลอด">ลาคลอด</option>
+          </datalist>
+        </div>
+        
+        <div class="button-group">
+          <button type="button" id="clockin" class="btn btn-primary">
+            <i class="fas fa-sign-in-alt btn-icon"></i> ลงเวลาเข้า
+          </button>
+          <button type="button" id="clockout" class="btn btn-warning">
+            <i class="fas fa-sign-out-alt btn-icon"></i> ลงเวลาออก
+          </button>
+        </div>
+        
+        <div id="message" class="alert" role="alert"></div>
+      </form>
+      
+      <div class="footer">
+        <p>พัฒนาโดยฝ่ายเทคโนโลยีสารสนเทศ</p>
+      </div>
+    </div>
   </div>
   
-  <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+  <!-- Line LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   
-  <!-- เรียกใช้ไฟล์ JavaScript ของเรา -->
+  <!-- jQuery & Bootstrap -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Custom JS -->
+  <script>
+    // แสดงเวลาปัจจุบัน (Digital Clock)
+    function showTime() {
+      const now = new Date();
+      let h = now.getHours();
+      let m = now.getMinutes();
+      let s = now.getSeconds();
+      
+      // เพิ่มเลข 0 ด้านหน้าถ้าน้อยกว่า 10
+      h = h < 10 ? "0" + h : h;
+      m = m < 10 ? "0" + m : m;
+      s = s < 10 ? "0" + s : s;
+      
+      const time = h + ":" + m + ":" + s;
+      document.getElementById("MyClockDisplay").innerText = time;
+      
+      // แสดงวันที่ปัจจุบัน
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const dateString = now.toLocaleDateString('th-TH', options);
+      document.getElementById("DateDisplay").innerText = dateString;
+      
+      setTimeout(showTime, 1000);
+    }
+    
+    // เริ่มแสดงเวลาเมื่อหน้าเพจโหลดเสร็จ
+    document.addEventListener('DOMContentLoaded', function() {
+      showTime();
+      
+      // ต่อจากนี้คือการเรียกใช้ main.js ของคุณ
+      // ไม่ต้องแก้ไขส่วนนี้ตามที่คุณระบุ
+    });
+  </script>
+  
+  <!-- นำเข้า main.js ของคุณ -->
   <script src="js/main.js"></script>
 </body>
-
 </html>
