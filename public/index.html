@@ -6,9 +6,11 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบลงเวลาออนไลน์ หน่วยงาน</title>
-  <link rel="icon"https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
+  <link rel="icon" href="https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <!-- เรียกใช้ไฟล์ CSS ของเรา -->
   <link rel="stylesheet" href="css/style.css">
 
@@ -20,50 +22,56 @@
 </head>
 
 <body>
-  <div class="wrapper text-center" style="max-width:350px">
-    <div class="site-logo text-center"></div>
-    <h5>ระบบลงเวลาออนไลน์ หน่วยงาน</h5>
+  <div class="container">
+    <div class="wrapper text-center">
+      <div class="site-logo text-center"></div>
+      <h4 class="app-title">ระบบลงเวลาออนไลน์ หน่วยงาน</h4>
 
-    <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
-
-    <form id="myForm">
-
-      <div class="row mt-4">
-        <div class="form-group col">
-          <label for="employee">พิมพ์ชื่อหรือรหัส </label>
-          <input id="employee" class="text-center"> <br>
-        </div>
+      <div class="clock-container">
+        <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
       </div>
 
-      <div class="row mt-4">
-        <div class="form-group col">
-          <label for="lblinfo"><i class="fas fa-book-reader"></i> หมายเหตุ:ประชุม/กิจกรรม อื่นๆ</label>
-          <input type="search" class="form-control form-control-lg" id="userinfo" name="userinfo" list="list">
-          <datalist id="list">
-            <option value="ไปราชการ">ไปราชการ</option>
-            <option value="ลากิจ">ลากิจ</option>
-            <option value="ลาป่วย">ลาป่วย</option>
-            <option value="ลาคลอด">ลาคลอด</option>
-          </datalist>
+      <form id="myForm">
+        <div class="row mt-4">
+          <div class="form-group col">
+            <label for="employee" class="form-label"><i class="fas fa-user"></i> พิมพ์ชื่อหรือรหัส</label>
+            <input id="employee" class="form-control text-center"> <br>
+          </div>
         </div>
-      </div>
 
-      <div class="row mt-4 g-2">
-        <div class="col-6">
-          <button id="clockin" type="button" class="btn btn-lg btn-primary w-100">Clock In</button>
+        <div class="row mt-2">
+          <div class="form-group col">
+            <label for="userinfo" class="form-label"><i class="fas fa-book-reader"></i> หมายเหตุ: ประชุม/กิจกรรม อื่นๆ</label>
+            <input type="search" class="form-control" id="userinfo" name="userinfo" list="list">
+            <datalist id="list">
+              <option value="ไปราชการ">ไปราชการ</option>
+              <option value="ลากิจ">ลากิจ</option>
+              <option value="ลาป่วย">ลาป่วย</option>
+              <option value="ลาคลอด">ลาคลอด</option>
+            </datalist>
+          </div>
         </div>
-        <div class="col-6">
-          <button id="clockout" type="button" class="btn btn-lg btn-warning w-100">Clock Out</button>
-        </div>
-      </div>
 
-      <div class="row mt-4">
-        <div class="form-group col">
-          <div class="alert" role="alert" id="message"></div>
+        <div class="row mt-4 g-2">
+          <div class="col-6">
+            <button id="clockin" type="button" class="btn btn-primary w-100">
+              <i class="fas fa-sign-in-alt"></i> Clock In
+            </button>
+          </div>
+          <div class="col-6">
+            <button id="clockout" type="button" class="btn btn-warning w-100">
+              <i class="fas fa-sign-out-alt"></i> Clock Out
+            </button>
+          </div>
         </div>
-      </div>
 
-    </form>
+        <div class="row mt-4">
+          <div class="form-group col">
+            <div class="alert" role="alert" id="message"></div>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
   
   <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
