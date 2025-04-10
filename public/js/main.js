@@ -156,34 +156,33 @@ function getEmployees() {
 function getClientTime() {
   // สร้างวัตถุเวลาปัจจุบัน
   var currentTime = new Date();
-
-  // คำนวณเวลาโซน
-  var thaiTime = new Date(currentTime.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  
+  // ไม่ต้องคำนวณเวลาโซนเพิ่มเติม เพราะเราจะให้เซิร์ฟเวอร์จัดการ
+  var clientTime = new Date(currentTime);
 
   // ดึงค่าชดเชยเวลาจาก localStorage
   var timeOffset = localStorage.getItem('time_offset') || 0;
   timeOffset = parseInt(timeOffset);
 
-  // เพิ่มค่าชดเชยเวลา
+  // เพิ่มค่าชดเชยเวลาถ้าจำเป็น
   if (timeOffset !== 0) {
-    thaiTime.setMinutes(thaiTime.getMinutes() + timeOffset);
+    clientTime.setMinutes(clientTime.getMinutes() + timeOffset);
   }
 
   // แสดงข้อมูลการดีบั๊ก
   console.group('Client Time Debugging');
   console.log('Original Time (Local):', currentTime);
-  console.log('Thai Time:', thaiTime);
+  console.log('Client Time with Offset:', clientTime);
   console.log('Time Offset:', timeOffset, 'minutes');
   console.log('Timezone Offset:', 
-    -thaiTime.getTimezoneOffset(), 
+    -clientTime.getTimezoneOffset(), 
     'minutes (Difference from UTC)'
   );
-  console.log('Final Thai Time (Local):', thaiTime.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
-  console.log('Final ISO String:', thaiTime.toISOString());
+  console.log('Final ISO String:', clientTime.toISOString());
   console.groupEnd();
 
   // คืนค่าเวลาในรูปแบบ ISO string
-  return thaiTime.toISOString();
+  return clientTime.toISOString();
 }
 
 // แก้ไขฟังก์ชัน ClockIn
@@ -247,7 +246,19 @@ async function ClockIn() {
           }
 
           setTimeout(() => {
-            var message = res.employee + '<br> บันทึกเวลามา ' + res.return_date;
+            // ใช้เวลาที่ได้รับจาก server เพื่อให้แน่ใจว่าแสดงเวลาไทยที่ถูกต้อง
+            var returnDate;
+            if (res.return_date_utc) {
+              // ถ้ามีการส่งเวลา UTC มา ให้แปลงเป็นเวลาท้องถิ่น
+              var utcTime = new Date(res.return_date_utc);
+              var thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
+              returnDate = thaiTime.toLocaleTimeString('th-TH');
+            } else {
+              // ถ้าไม่มี ให้ใช้เวลาที่ server ส่งมาตรงๆ
+              returnDate = res.return_date;
+            }
+            
+            var message = res.employee + '<br> บันทึกเวลามา ' + returnDate;
             $('#message').html(message);
             document.getElementById("message").className = "alert alert-primary";
             clearForm();
@@ -335,7 +346,19 @@ async function ClockOut() {
           }
 
           setTimeout(() => {
-            var message = res.employee + '<br> บันทึกเวลากลับ ' + res.return_date;
+            // ใช้เวลาที่ได้รับจาก server เพื่อให้แน่ใจว่าแสดงเวลาไทยที่ถูกต้อง
+            var returnDate;
+            if (res.return_date_utc) {
+              // ถ้ามีการส่งเวลา UTC มา ให้แปลงเป็นเวลาท้องถิ่น
+              var utcTime = new Date(res.return_date_utc);
+              var thaiTime = new Date(utcTime.getTime() + (7 * 60 * 60 * 1000));
+              returnDate = thaiTime.toLocaleTimeString('th-TH');
+            } else {
+              // ถ้าไม่มี ให้ใช้เวลาที่ server ส่งมาตรงๆ
+              returnDate = res.return_date;
+            }
+            
+            var message = res.employee + '<br> บันทึกเวลากลับ ' + returnDate;
             $('#message').html(message);
             document.getElementById("message").className = "alert alert-primary";
             clearForm();
@@ -366,85 +389,93 @@ async function ClockOut() {
 
 // ฟังก์ชันดึงตำแหน่ง GPS
 function getlocation() {
-if (navigator.geolocation) {
-navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
-} else {
-console.log("Geolocation is not supported by this browser.");
-}
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
+  } else {
+    console.log("Geolocation is not supported by this browser.");
+  }
 }
 
 // ฟังก์ชันเมื่อดึงตำแหน่ง GPS สำเร็จ
 function showPosition(position) {
-var lat = position.coords.latitude;
-var lon = position.coords.longitude;
-gps = [lat, lon];
-console.log("🚀 ~ gps:", gps);
-console.log("Latitude: " + lat + " Longitude: " + lon);
+  var lat = position.coords.latitude;
+  var lon = position.coords.longitude;
+  gps = [lat, lon];
+  console.log("🚀 ~ gps:", gps);
+  console.log("Latitude: " + lat + " Longitude: " + lon);
 }
 
 // ฟังก์ชันดึงตำแหน่งจากพารามิเตอร์ URL
 function getLocationFromParameter() {
-var url = new URL(window.location.href);
-var lat = url.searchParams.get("lat");
-var lon = url.searchParams.get("lon");
-gps = [lat, lon];
-console.log("Latitude: " + lat + " Longitude: " + lon);
+  var url = new URL(window.location.href);
+  var lat = url.searchParams.get("lat");
+  var lon = url.searchParams.get("lon");
+  gps = [lat, lon];
+  console.log("Latitude: " + lat + " Longitude: " + lon);
 }
 
 // ฟังก์ชันดึงตำแหน่งจาก API (กรณีไม่สามารถใช้ Geolocation)
 function getLocationFromApi() {
-$.getJSON('https://ipapi.co/json/', function (data) {
-var lat = data.latitude;
-var lon = data.longitude;
-gps = [lat, lon];
-console.log("Latitude: " + lat + " Longitude: " + lon);
-return gps;
-});
+  $.getJSON('https://ipapi.co/json/', function (data) {
+    var lat = data.latitude;
+    var lon = data.longitude;
+    gps = [lat, lon];
+    console.log("Latitude: " + lat + " Longitude: " + lon);
+    return gps;
+  });
 }
 
 // ฟังก์ชันล้างฟอร์ม
 function clearForm() {
-setTimeout(function () {
-document.getElementById('message').innerText = owner;
-document.getElementById("message").className = "alert msgBg";
-document.getElementById("myForm").reset();
-}, 5000);
+  setTimeout(function () {
+    document.getElementById('message').innerText = owner;
+    document.getElementById("message").className = "alert msgBg";
+    document.getElementById("myForm").reset();
+  }, 5000);
 }
 
 // ฟังก์ชันแสดงเวลาใหม่ที่รองรับการชดเชยเวลา
 function showTime() {
-var date = new Date();
-var h = date.getHours(); // 0 - 23
-var m = date.getMinutes(); // 0 - 59
-var s = date.getSeconds(); // 0 - 59
-var dot = document.textContent = '.';
+  var date = new Date();
+  var h = date.getHours(); // 0 - 23
+  var m = date.getMinutes(); // 0 - 59
+  var s = date.getSeconds(); // 0 - 59
+  var dot = document.textContent = '.';
 
-// ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
-var timeOffset = localStorage.getItem('time_offset') || 0;
-timeOffset = parseInt(timeOffset);
+  // ปรับเวลาให้ตรงโดยใช้ค่าชดเชยเวลา
+  // ไม่ต้องปรับตามโซนเวลา เพราะเวลาที่ได้จาก new Date() เป็นเวลาท้องถิ่นอยู่แล้ว
+  // แต่อาจมีค่าชดเชยเฉพาะกรณีที่ต้องปรับเวลาให้ถูกต้อง
 
-// คำนวณเวลาใหม่ (เพิ่มชั่วโมงและนาที)
-if (timeOffset !== 0) {
-var totalMinutes = h * 60 + m + timeOffset;
-h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
-m = totalMinutes % 60;
-}
+  // ดึงค่าชดเชยเวลาจาก localStorage (ถ้ามี)
+  var timeOffset = localStorage.getItem('time_offset') || 0;
+  timeOffset = parseInt(timeOffset);
 
-if (s % 2 == 1) {
-dot = document.textContent = '.';
-} else {
-dot = document.textContent = '\xa0';
-}
+  // คำนวณเวลาที่ปรับแล้ว
+  if (timeOffset !== 0) {
+    var totalMinutes = h * 60 + m + timeOffset;
+    h = Math.floor(totalMinutes / 60) % 24; // ทำให้ชั่วโมงอยู่ในช่วง 0-23
+    m = totalMinutes % 60;
+  }
 
-h = h < 10 ? "0" + h : h;
-m = m < 10 ? "0" + m : m;
-s = s < 10 ? "0" + s : s;
+  // ควบคุมจุดกระพริบ
+  if (s % 2 == 1) {
+    dot = document.textContent = '.';
+  } else {
+    dot = document.textContent = '\xa0';
+  }
 
-var time = h + ":" + m + ":" + s + '' + dot;
-document.getElementById("MyClockDisplay").innerText = time;
-document.getElementById("MyClockDisplay").textContent = time;
+  // เพิ่ม 0 นำหน้าตัวเลขถ้าจำเป็น
+  h = h < 10 ? "0" + h : h;
+  m = m < 10 ? "0" + m : m;
+  s = s < 10 ? "0" + s : s;
 
-setTimeout(showTime, 1000);
+  // แสดงเวลา
+  var time = h + ":" + m + ":" + s + '' + dot;
+  document.getElementById("MyClockDisplay").innerText = time;
+  document.getElementById("MyClockDisplay").textContent = time;
+
+  // เรียกฟังก์ชันนี้ทุก 1 วินาที
+  setTimeout(showTime, 1000);
 }
 
 // เริ่มแสดงเวลาเมื่อโหลดหน้า
