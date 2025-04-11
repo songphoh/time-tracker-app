@@ -311,38 +311,22 @@ app.post('/api/clockin', async (req, res) => {
       'SELECT setting_value FROM settings WHERE setting_name = $1',
       ['notify_clock_in']
     );
-
+    
     // สร้างข้อความสำหรับส่งแจ้งเตือน
     const date = new Date(now);
-    const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
-    const thaiDate = thaiFormatter.format(date);
-
     const hours = String(date.getUTCHours() + 7).padStart(2, '0');
     const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     const seconds = String(date.getUTCSeconds()).padStart(2, '0');
     const returnDate = `${hours}:${minutes}:${seconds}`;
-
-    // สถานที่หรือที่อยู่ (ถ้ามีระบบเพิ่มเติมที่ระบุชื่อสถานที่จากพิกัด)
-    const location = lat && lon ? `${lat}, ${lon}` : "ไม่มีข้อมูล";
-
-    let message =
-      `⏱ ลงเวลาเข้างาน\n` +
-      `👤 ชื่อ-นามสกุล: *${employee}*\n` +
-      `📅 วันที่: *${thaiDate}*\n` +
-      `🕒 เวลา: *${returnDate}*\n` +
-      (line_name ? `💬 ชื่อไลน์: *${line_name}*\n` : "") +
-      (userinfo ? `📝 หมายเหตุ: *${userinfo}*\n` : "") +
-      (lat && lon ? `📍 พิกัด: *${location}*\n` +
-      `🗺 แผนที่: [ดูแผนที่](https://www.google.com/maps/place/${lat},${lon})` : "📍 พิกัด: *ไม่มีข้อมูล*");
-
+    
+    let message = `${employee} ลงเวลาเข้างาน ${returnDate}`;
+    if (userinfo) {
+      message += `\nหมายเหตุ: ${userinfo}`;
+    }
+    
     // ส่งการแจ้งเตือนถ้าตั้งค่าไว้
     if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
-      await sendTelegramToAllGroups(message, lat, lon, employee);
+      await sendTelegramToAllGroups(message, lat, lon);
     }
     
     return res.json({
@@ -428,37 +412,19 @@ app.post('/api/clockout', async (req, res) => {
       'SELECT setting_value FROM settings WHERE setting_name = $1',
       ['notify_clock_out']
     );
-
+    
     // สร้างข้อความสำหรับส่งแจ้งเตือน
     const date = new Date(now);
-    const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
-    const thaiDate = thaiFormatter.format(date);
-
     const hours = String(date.getUTCHours() + 7).padStart(2, '0');
     const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     const seconds = String(date.getUTCSeconds()).padStart(2, '0');
     const returnDate = `${hours}:${minutes}:${seconds}`;
-
-    // สถานที่หรือที่อยู่
-    const location = lat && lon ? `${lat}, ${lon}` : "ไม่มีข้อมูล";
-
-    let message =
-      `⏱ ลงเวลาออกงาน\n` +
-      `👤 ชื่อ-นามสกุล: *${employee}*\n` +
-      `📅 วันที่: *${thaiDate}*\n` +
-      `🕒 เวลา: *${returnDate}*\n` +
-      (line_name ? `💬 ชื่อไลน์: *${line_name}*\n` : "") +
-      (lat && lon ? `📍 พิกัด: *${location}*\n` +
-      `🗺 แผนที่: [ดูแผนที่](https://www.google.com/maps/place/${lat},${lon})` : "📍 พิกัด: *ไม่มีข้อมูล*");
-
+    
+    let message = `${employee} ลงเวลาออกงาน ${returnDate}`;
+    
     // ส่งการแจ้งเตือนถ้าตั้งค่าไว้
     if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
-      await sendTelegramToAllGroups(message, lat, lon, employee);
+      await sendTelegramToAllGroups(message, lat, lon);
     }
     
     return res.json({
@@ -518,7 +484,7 @@ app.post('/api/sendnotify', async (req, res) => {
 
 // เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
 // เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
-async function sendTelegramToAllGroups(message, lat, lon, employee) {
+async function sendTelegramToAllGroups(message, lat, lon) {
   try {
     // ดึง token
     const tokenResult = await pool.query(
@@ -547,36 +513,32 @@ async function sendTelegramToAllGroups(message, lat, lon, employee) {
     try {
       const groups = JSON.parse(groupsResult.rows[0].setting_value);
       
-      // สร้าง URL แผนที่จาก OpenStreetMap
-      let mapUrl = null;
-      if (lat && lon) {
-        mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=600x400&markers=${lat},${lon},red`;
-      }
-      
       // ส่งข้อความไปยังแต่ละกลุ่มที่เปิดใช้งาน
       for (const group of groups) {
         if (group.active && group.chat_id) {
           try {
             console.log(`Sending Telegram message to ${group.name} (${group.chat_id})`);
             
-            // ส่งข้อความก่อน
+            // 1. ส่งข้อความปกติก่อน
             await axios.post(
               `https://api.telegram.org/bot${token}/sendMessage`,
               {
                 chat_id: group.chat_id,
                 text: message,
-                parse_mode: 'Markdown'
+                parse_mode: "Markdown"
               }
             );
             
-            // ถ้ามีพิกัด ส่งแผนที่ตามไป
-            if (mapUrl) {
+            // 2. ถ้ามีพิกัด ให้ส่งตำแหน่งแผนที่ (Telegram จะสร้างภาพแผนที่ให้อัตโนมัติ)
+            if (lat && lon) {
               await axios.post(
-                `https://api.telegram.org/bot${token}/sendPhoto`,
+                `https://api.telegram.org/bot${token}/sendLocation`,
                 {
                   chat_id: group.chat_id,
-                  photo: mapUrl,
-                  caption: `ตำแหน่งของ ${employee || 'พนักงาน'}`
+                  latitude: parseFloat(lat),
+                  longitude: parseFloat(lon),
+                  // เพิ่มค่า live_period หากต้องการส่งตำแหน่งแบบ live location
+                  // live_period: 3600 // ส่งตำแหน่งแบบ live (อัพเดทได้) นาน 1 ชั่วโมง
                 }
               );
             }
@@ -1318,24 +1280,14 @@ app.post('/api/admin/time-logs', async (req, res) => {
       if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
         // สร้างข้อความสำหรับส่งแจ้งเตือน
         const clockInDate = new Date(new Date(clock_in).getTime() + (7 * 60 * 60 * 1000));
-        const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          weekday: 'long'
-        });
-        const thaiDate = thaiFormatter.format(clockInDate);
         const timeStr = clockInDate.toLocaleTimeString('th-TH');
-        
-        let message =
-          `⏱ ลงเวลาเข้างาน (บันทึกโดยแอดมิน)\n` +
-          `👤 ชื่อ-นามสกุล: *${employee.full_name}*\n` +
-          `📅 วันที่: *${thaiDate}*\n` +
-          `🕒 เวลา: *${timeStr}*\n` +
-          (note ? `📝 หมายเหตุ: *${note}*\n` : "");
+        let message = `${employee.full_name} ลงเวลาเข้างาน ${timeStr} (บันทึกโดยแอดมิน)`;
+        if (note) {
+          message += `\nหมายเหตุ: ${note}`;
+        }
         
         // ส่งแจ้งเตือน
-        await sendTelegramToAllGroups(message, null, null, employee.full_name);
+        await sendTelegramToAllGroups(message, null, null);
       }
       
       // ถ้ามีการลงเวลาออกด้วย
@@ -1348,23 +1300,11 @@ app.post('/api/admin/time-logs', async (req, res) => {
         if (notifyOutSettingResult.rows.length > 0 && notifyOutSettingResult.rows[0].setting_value === '1') {
           // สร้างข้อความสำหรับส่งแจ้งเตือน
           const clockOutDate = new Date(new Date(clock_out).getTime() + (7 * 60 * 60 * 1000));
-          const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'long'
-          });
-          const thaiDate = thaiFormatter.format(clockOutDate);
           const timeStr = clockOutDate.toLocaleTimeString('th-TH');
-          
-          let message =
-            `⏱ ลงเวลาออกงาน (บันทึกโดยแอดมิน)\n` +
-            `👤 ชื่อ-นามสกุล: *${employee.full_name}*\n` +
-            `📅 วันที่: *${thaiDate}*\n` +
-            `🕒 เวลา: *${timeStr}*\n`;
+          let message = `${employee.full_name} ลงเวลาออกงาน ${timeStr} (บันทึกโดยแอดมิน)`;
           
           // ส่งแจ้งเตือน
-          await sendTelegramToAllGroups(message, null, null, employee.full_name);
+          await sendTelegramToAllGroups(message, null, null);
         }
       }
     }
