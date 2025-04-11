@@ -24,7 +24,7 @@
     <div class="site-logo text-center"></div>
     <h5>ระบบลงเวลาออนไลน์ หน่วยงาน</h5>
 
-    <div id="MyClockDisplay" class="clock mt-3"></div>
+    <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
 
     <form id="myForm">
 
@@ -48,7 +48,7 @@
         </div>
       </div>
 
-      <div class="clock-buttons" style="display: flex; gap: 15px; width: 100%; margin: 25px 0;">
+      <div class="clock-buttons" style="display: flex; gap: 20px; width: 100%; margin: 25px 0;">
         <button id="clockin" type="button" class="btn btn-primary" style="flex: 1;">🕓 Clock In</button>
         <button id="clockout" type="button" class="btn btn-warning" style="flex: 1;">🕓 Clock Out</button>
       </div>
