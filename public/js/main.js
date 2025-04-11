@@ -398,28 +398,42 @@ function showTime() {
   var h = date.getHours(); // 0 - 23 (เวลาท้องถิ่น)
   var m = date.getMinutes(); // 0 - 59
   var s = date.getSeconds(); // 0 - 59
-  var dot = document.textContent = '.';
+  var dot = ':'; // ให้เริ่มต้นเป็น : เสมอ
 
-  // ควบคุมจุดกระพริบ
-  if (s % 2 == 1) {
-    dot = document.textContent = '.';
-  } else {
-    dot = document.textContent = '\xa0';
-  }
+  // ควบคุมจุดกระพริบ (ใช้เทคนิค CSS visibility แทน)
+  var separator = s % 2 === 0 ? '<span class="blink">:</span>' : '<span class="blink" style="visibility:hidden">:</span>';
 
   // เพิ่ม 0 นำหน้าตัวเลขถ้าจำเป็น
   h = h < 10 ? "0" + h : h;
   m = m < 10 ? "0" + m : m;
   s = s < 10 ? "0" + s : s;
 
-  // แสดงเวลา
-  var time = h + ":" + m + ":" + s + '' + dot;
-  document.getElementById("MyClockDisplay").innerText = time;
-  document.getElementById("MyClockDisplay").textContent = time;
+  // แสดงเวลาโดยใช้ innerHTML เพื่อรองรับ HTML tags
+  // แบ่งเป็น 3 ส่วนคือ ชั่วโมง:นาที:วินาที
+  var timeDisplay = document.getElementById("MyClockDisplay");
+  timeDisplay.innerHTML = h + separator + m + '<span class="dot">:</span>' + s;
 
   // เรียกฟังก์ชันนี้ทุก 1 วินาที
   setTimeout(showTime, 1000);
 }
+
+// เพิ่ม CSS สำหรับควบคุมการกระพริบ
+var style = document.createElement('style');
+style.innerHTML = `
+.blink {
+  animation: blink-animation 1s steps(2, start) infinite;
+}
+@keyframes blink-animation {
+  to {
+    visibility: hidden;
+  }
+}
+.dot {
+  display: inline-block;
+  min-width: 8px;
+}
+`;
+document.head.appendChild(style);
 
 // เริ่มแสดงเวลาเมื่อโหลดหน้า
 showTime();
