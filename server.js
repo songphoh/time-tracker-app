@@ -516,15 +516,37 @@ app.post('/api/sendnotify', async (req, res) => {
   }
 });
 
-// เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
-// เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
+// เปลี่ยนฟังก์ชัน sendTelegramToAllGroups ให้ส่งข้อมูลไปยัง GSA แทน
 async function sendTelegramToAllGroups(message, lat, lon, employee) {
   try {
-    // ดึง token
+    // ดึง token และ URL ของ GSA
     const tokenResult = await pool.query(
       'SELECT setting_value FROM settings WHERE setting_name = $1',
       ['telegram_bot_token']
     );
+
+    const gasUrlResult = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['gas_web_app_url']
+    );
+    
+    // ถ้าไม่มี URL ของ GSA ในฐานข้อมูล ให้ใช้ค่าเริ่มต้น
+    let gasUrl = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+    
+    if (gasUrlResult.rows.length > 0 && gasUrlResult.rows[0].setting_value) {
+      gasUrl = gasUrlResult.rows[0].setting_value;
+    } else {
+      console.log('ไม่พบ URL ของ GSA ในฐานข้อมูล ใช้ค่าเริ่มต้น');
+      // บันทึก URL เริ่มต้นลงฐานข้อมูล
+      try {
+        await pool.query(
+          'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3) ON CONFLICT (setting_name) DO UPDATE SET setting_value = $2',
+          ['gas_web_app_url', gasUrl, 'URL ของ Google Apps Script Web App']
+        );
+      } catch (error) {
+        console.error('Error saving default GAS URL:', error.message);
+      }
+    }
     
     if (tokenResult.rows.length === 0 || !tokenResult.rows[0].setting_value) {
       console.error('Error getting Telegram token or token not set');
@@ -547,43 +569,32 @@ async function sendTelegramToAllGroups(message, lat, lon, employee) {
     try {
       const groups = JSON.parse(groupsResult.rows[0].setting_value);
       
-      // สร้าง URL แผนที่จาก OpenStreetMap
-      let mapUrl = null;
-      if (lat && lon) {
-        mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=600x400&markers=${lat},${lon},red`;
-      }
-      
-      // ส่งข้อความไปยังแต่ละกลุ่มที่เปิดใช้งาน
+      // ส่งข้อความไปยังแต่ละกลุ่มที่เปิดใช้งานผ่าน GSA
       for (const group of groups) {
         if (group.active && group.chat_id) {
           try {
-            console.log(`Sending Telegram message to ${group.name} (${group.chat_id})`);
+            console.log(`Sending message to ${group.name} (${group.chat_id}) via GSA`);
             
-            // ส่งข้อความก่อน
-            await axios.post(
-              `https://api.telegram.org/bot${token}/sendMessage`,
-              {
-                chat_id: group.chat_id,
-                text: message,
-                parse_mode: 'Markdown'
-              }
-            );
+            // เตรียมข้อมูลสำหรับส่งไปยัง GSA
+            const payload = {
+              opt: 'sendToTelegram',
+              data: JSON.stringify({
+                message: message,
+                chatId: group.chat_id,
+                token: token,
+                lat: lat,
+                lon: lon
+              })
+            };
             
-            // ถ้ามีพิกัด ส่งแผนที่ตามไป
-            if (mapUrl) {
-              await axios.post(
-                `https://api.telegram.org/bot${token}/sendPhoto`,
-                {
-                  chat_id: group.chat_id,
-                  photo: mapUrl,
-                  caption: `ตำแหน่งของ ${employee || 'พนักงาน'}`
-                }
-              );
-            }
+            // ส่งข้อมูลไปยัง GSA ด้วย HTTP POST
+            const response = await axios.post(gasUrl, null, {
+              params: payload
+            });
             
-            console.log(`Message sent to ${group.name} successfully`);
+            console.log(`Message sent to ${group.name} via GSA successfully:`, response.data);
           } catch (error) {
-            console.error(`Error sending message to ${group.name}:`, error.message);
+            console.error(`Error sending message to ${group.name} via GSA:`, error.message);
           }
         }
       }
@@ -592,6 +603,270 @@ async function sendTelegramToAllGroups(message, lat, lon, employee) {
     }
   } catch (error) {
     console.error('Error in sendTelegramToAllGroups:', error.message);
+  }
+}
+
+// เพิ่ม API endpoint สำหรับตั้งค่า URL ของ Google Apps Script
+app.post('/api/admin/set-gas-url', async (req, res) => {
+  console.log('API: admin/set-gas-url - ตั้งค่า URL ของ GSA', req.body);
+  
+  try {
+    const { gas_url } = req.body;
+    
+    if (!gas_url) {
+      return res.json({ success: false, message: 'กรุณาระบุ URL' });
+    }
+    
+    // บันทึก URL ลงฐานข้อมูล
+    await pool.query(
+      'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3) ON CONFLICT (setting_name) DO UPDATE SET setting_value = $2',
+      ['gas_web_app_url', gas_url, 'URL ของ Google Apps Script Web App']
+    );
+    
+    console.log('GAS URL updated:', gas_url);
+    res.json({ success: true, message: 'บันทึก URL เรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('Error setting GAS URL:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// เพิ่ม API endpoint สำหรับทดสอบการส่งข้อความผ่าน GSA
+app.post('/api/admin/test-gas', async (req, res) => {
+  console.log('API: admin/test-gas - ทดสอบการส่งข้อความผ่าน GSA', req.body);
+  
+  try {
+    const { message, lat, lon } = req.body;
+    
+    if (!message) {
+      return res.json({ success: false, message: 'กรุณาระบุข้อความ' });
+    }
+    
+    // ดึง URL ของ GSA
+    const gasUrlResult = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['gas_web_app_url']
+    );
+    
+    if (gasUrlResult.rows.length === 0 || !gasUrlResult.rows[0].setting_value) {
+      return res.json({ success: false, message: 'ไม่พบ URL ของ GSA กรุณาตั้งค่าก่อน' });
+    }
+    
+    const gasUrl = gasUrlResult.rows[0].setting_value;
+    
+    // ดึง token และ chat_id
+    const tokenResult = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['telegram_bot_token']
+    );
+    
+    if (tokenResult.rows.length === 0 || !tokenResult.rows[0].setting_value) {
+      return res.json({ success: false, message: 'ไม่พบ Token ของ Telegram กรุณาตั้งค่าก่อน' });
+    }
+    
+    const token = tokenResult.rows[0].setting_value;
+    
+    // ดึงข้อมูลกลุ่มแรกที่เปิดใช้งาน
+    const groupsResult = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['telegram_groups']
+    );
+    
+    if (groupsResult.rows.length === 0 || !groupsResult.rows[0].setting_value) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลกลุ่ม Telegram กรุณาตั้งค่าก่อน' });
+    }
+    
+    const groups = JSON.parse(groupsResult.rows[0].setting_value);
+    const activeGroup = groups.find(g => g.active && g.chat_id);
+    
+    if (!activeGroup) {
+      return res.json({ success: false, message: 'ไม่พบกลุ่ม Telegram ที่เปิดใช้งาน' });
+    }
+    
+    // เตรียมข้อมูลสำหรับส่งไปยัง GSA
+    const payload = {
+      opt: 'sendToTelegram',
+      data: JSON.stringify({
+        message: message,
+        chatId: activeGroup.chat_id,
+        token: token,
+        lat: lat,
+        lon: lon
+      })
+    };
+    
+    // ส่งข้อมูลไปยัง GSA ด้วย HTTP POST
+    const response = await axios.post(gasUrl, null, {
+      params: payload
+    });
+    
+    console.log('Test message sent via GSA:', response.data);
+    res.json({ 
+      success: true, 
+      message: 'ส่งข้อความทดสอบเรียบร้อยแล้ว', 
+      response: response.data 
+    });
+  } catch (error) {
+    console.error('Error testing GAS:', error);
+    res.json({ 
+      success: false, 
+      message: 'เกิดข้อผิดพลาด: ' + error.message,
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// ปรับปรุงฟังก์ชัน initializeDatabase เพื่อเพิ่ม setting สำหรับ GAS URL
+async function initializeDatabase() {
+  console.log('กำลังตรวจสอบและสร้างตาราง...');
+  
+  const client = await pool.connect();
+  
+  try {
+    // เริ่ม transaction
+    await client.query('BEGIN');
+    
+    // (ส่วนโค้ดอื่นๆ ยังคงเหมือนเดิม)
+    // สร้างตารางเก็บรายชื่อพนักงาน
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id SERIAL PRIMARY KEY,
+        emp_code TEXT NOT NULL UNIQUE,
+        full_name TEXT NOT NULL,
+        position TEXT,
+        department TEXT,
+        line_id TEXT,
+        line_name TEXT,
+        line_picture TEXT,
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('ตาราง employees สร้างหรือมีอยู่แล้ว');
+
+    // สร้างตารางเก็บบันทึกเวลา
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS time_logs (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL,
+        clock_in TIMESTAMP,
+        clock_out TIMESTAMP,
+        note TEXT,
+        latitude_in REAL,
+        longitude_in REAL,
+        latitude_out REAL,
+        longitude_out REAL,
+        line_id TEXT,
+        line_name TEXT,
+        line_picture TEXT,
+        status TEXT DEFAULT 'normal',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+    console.log('ตาราง time_logs สร้างหรือมีอยู่แล้ว');
+
+    // สร้างตารางเก็บค่า settings
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id SERIAL PRIMARY KEY,
+        setting_name TEXT NOT NULL UNIQUE,
+        setting_value TEXT,
+        description TEXT
+      )
+    `);
+    console.log('ตาราง settings สร้างหรือมีอยู่แล้ว');
+    
+    // Commit transaction
+    await client.query('COMMIT');
+    
+    // ตรวจสอบและเพิ่มข้อมูลเริ่มต้น
+    await addInitialSettings(client);
+    await addSampleEmployees(client);
+    
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error initializing database:', err.message);
+  } finally {
+    client.release();
+  }
+}
+
+// ปรับปรุงฟังก์ชัน addInitialSettings เพื่อเพิ่ม setting สำหรับ GAS URL
+async function addInitialSettings(client) {
+  try {
+    // ตรวจสอบว่ามีข้อมูลในตาราง settings หรือไม่
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM settings');
+    
+    if (parseInt(countResult.rows[0].count) === 0) {
+      console.log('กำลังเพิ่มการตั้งค่าเริ่มต้น...');
+      
+      const settings = [
+        { name: 'organization_name', value: 'องค์การบริหารส่วนตำบลหัวนา', desc: 'ชื่อหน่วยงาน' },
+        { name: 'work_start_time', value: '08:30', desc: 'เวลาเริ่มงาน' },
+        { name: 'work_end_time', value: '16:30', desc: 'เวลาเลิกงาน' },
+        { name: 'allowed_ip', value: '', desc: 'IP Address ที่อนุญาต' },
+        { name: 'telegram_bot_token', value: '', desc: 'Token สำหรับ Telegram Bot' },
+        { name: 'telegram_groups', value: '[{"name":"กลุ่มหลัก","chat_id":"","active":true}]', desc: 'กลุ่มรับการแจ้งเตือน Telegram' },
+        { name: 'notify_clock_in', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาเข้า' },
+        { name: 'notify_clock_out', value: '1', desc: 'แจ้งเตือนเมื่อลงเวลาออก' },
+        { name: 'admin_username', value: 'admin', desc: 'ชื่อผู้ใช้สำหรับแอดมิน' },
+        { name: 'admin_password', value: 'admin123', desc: 'รหัสผ่านสำหรับแอดมิน' },
+        { name: 'liff_id', value: '2001032478-VR5Akj0k', desc: 'LINE LIFF ID' },
+        { name: 'time_offset', value: '420', desc: 'ค่าชดเชยเวลา (นาที)' },
+        // เพิ่ม setting สำหรับ GAS URL
+        { name: 'gas_web_app_url', value: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec', desc: 'URL ของ Google Apps Script Web App' },
+        // เพิ่ม setting สำหรับเลือกใช้ GSA แทน Telegram API โดยตรง
+        { name: 'use_gas_for_telegram', value: '1', desc: 'ใช้ Google Apps Script สำหรับส่งข้อความไป Telegram (1=ใช้, 0=ไม่ใช้)' }
+      ];
+      
+      const insertQuery = 'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3)';
+      
+      for (const setting of settings) {
+        await pool.query(insertQuery, [setting.name, setting.value, setting.desc]);
+      }
+      
+      console.log('เพิ่มการตั้งค่าเริ่มต้นเรียบร้อยแล้ว');
+    } else {
+      // ตรวจสอบและเพิ่ม setting ใหม่หากยังไม่มี
+      const newSettings = [
+        { name: 'gas_web_app_url', value: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec', desc: 'URL ของ Google Apps Script Web App' },
+        { name: 'use_gas_for_telegram', value: '1', desc: 'ใช้ Google Apps Script สำหรับส่งข้อความไป Telegram (1=ใช้, 0=ไม่ใช้)' }
+      ];
+      
+      for (const setting of newSettings) {
+        const checkResult = await pool.query('SELECT setting_name FROM settings WHERE setting_name = $1', [setting.name]);
+        
+        if (checkResult.rows.length === 0) {
+          await pool.query(
+            'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3)',
+            [setting.name, setting.value, setting.desc]
+          );
+          console.log(`เพิ่มการตั้งค่า ${setting.name} เรียบร้อยแล้ว`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error adding initial settings:', err.message);
+  }
+}
+
+// ตรวจสอบการตั้งค่าว่าใช้ GSA หรือไม่
+async function isUsingGasForTelegram() {
+  try {
+    const result = await pool.query(
+      'SELECT setting_value FROM settings WHERE setting_name = $1',
+      ['use_gas_for_telegram']
+    );
+    
+    if (result.rows.length > 0) {
+      return result.rows[0].setting_value === '1';
+    }
+    
+    return true; // ค่าเริ่มต้นคือใช้ GSA
+  } catch (error) {
+    console.error('Error checking if using GAS for Telegram:', error.message);
+    return true; // กรณีเกิดข้อผิดพลาด ให้ใช้ GSA
   }
 }
 
