@@ -14,6 +14,12 @@
   <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
   <!-- Custom CSS -->
   <link rel="stylesheet" href="../css/admin-style.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+  <!-- Library สำหรับอ่านไฟล์ Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Library สำหรับอ่านไฟล์ CSV -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
 <body>
   <!-- ส่วนหัว -->
@@ -65,15 +71,19 @@
   </nav>
 
   <!-- เนื้อหาหลัก -->
-  <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2>
-        <i class="fas fa-users text-primary me-2"></i> จัดการพนักงาน
-      </h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+      <i class="fas fa-users text-primary me-2"></i> จัดการพนักงาน
+    </h2>
+    <div>
+      <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#importEmployeeModal">
+        <i class="bi bi-file-earmark-excel me-1"></i> นำเข้าจาก Excel/CSV
+      </button>
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
         <i class="fas fa-plus me-1"></i> เพิ่มพนักงาน
       </button>
     </div>
+  </div>
 
     <!-- ตารางพนักงาน -->
     <div class="card">
@@ -103,10 +113,96 @@
   <!-- ฟุตเตอร์ -->
   <footer class="bg-light py-3 mt-5 border-top">
     <div class="container text-center text-muted small">
-      &copy; <span id="currentYear"></span> ระบบลงเวลาออนไลน์ | พัฒนาโดย องค์การบริหารส่วนตำบลหัวนา
+      &copy; <span id="currentYear"></span> ระบบลงเวลาออนไลน์ | พัฒนาโดย ผู้ช่วยเจ้าพนักงานธุรการ สป.
     </div>
   </footer>
   
+  <!-- Modal สำหรับนำเข้าพนักงาน -->
+<div class="modal fade" id="importEmployeeModal" tabindex="-1" aria-labelledby="importEmployeeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="importEmployeeModalLabel">นำเข้ารายชื่อพนักงานจาก Excel/CSV</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info">
+          <strong>คำแนะนำ:</strong> ไฟล์ Excel/CSV ควรมีคอลัมน์ดังนี้
+          <ul>
+            <li>รหัสพนักงาน (emp_code) - จำเป็นต้องมี</li>
+            <li>ชื่อ-นามสกุล (full_name) - จำเป็นต้องมี</li>
+            <li>ตำแหน่ง (position) - ไม่บังคับ</li>
+            <li>แผนก (department) - ไม่บังคับ</li>
+          </ul>
+          <a href="#" id="downloadTemplateBtn" class="btn btn-sm btn-outline-primary mt-2">
+            <i class="bi bi-download"></i> ดาวน์โหลดเทมเพลต
+          </a>
+        </div>
+
+        <div class="mb-3">
+          <label for="fileImport" class="form-label">อัปโหลดไฟล์ Excel หรือ CSV</label>
+          <input class="form-control" type="file" id="fileImport" accept=".xlsx,.xls,.csv">
+        </div>
+
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="skipExistingCheck" checked>
+          <label class="form-check-label" for="skipExistingCheck">
+            ข้ามรายการที่มีรหัสพนักงานซ้ำในระบบ
+          </label>
+        </div>
+
+        <div id="previewArea" class="d-none">
+          <h6>ตัวอย่างข้อมูล (10 รายการแรก)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>รหัสพนักงาน</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>ตำแหน่ง</th>
+                  <th>แผนก</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody">
+                <!-- จะถูกเติมด้วย JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div class="alert alert-warning mt-2" id="previewWarning" style="display: none;">
+            <i class="bi bi-exclamation-triangle"></i> พบข้อมูลที่อาจมีปัญหา โปรดตรวจสอบข้อมูลในตารางให้ครบถ้วน
+          </div>
+          <div class="text-end">
+            <span id="totalRecords" class="me-2">พบข้อมูลทั้งหมด 0 รายการ</span>
+          </div>
+        </div>
+
+        <div class="progress mt-3 d-none" id="uploadProgress">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+        </div>
+        
+        <div id="importResult" class="mt-3 d-none">
+          <div class="alert alert-success" id="importSuccess" style="display: none;">
+            นำเข้าข้อมูลสำเร็จ <span id="importSuccessCount">0</span> รายการ
+          </div>
+          <div class="alert alert-warning" id="importWarning" style="display: none;">
+            ข้ามข้อมูลที่มีรหัสซ้ำ <span id="importSkippedCount">0</span> รายการ
+          </div>
+          <div class="alert alert-danger" id="importError" style="display: none;">
+            เกิดข้อผิดพลาด <span id="importErrorCount">0</span> รายการ
+            <ul id="importErrorList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+        <button type="button" class="btn btn-primary" id="previewBtn">ตรวจสอบข้อมูล</button>
+        <button type="button" class="btn btn-success d-none" id="importBtn">นำเข้าข้อมูล</button>
+      </div>
+    </div>
+  </div>
+</div>
+
   <!-- Modal เพิ่ม/แก้ไขพนักงาน -->
   <div class="modal fade" id="employeeModal" tabindex="-1">
     <div class="modal-dialog">
@@ -176,6 +272,11 @@
     </div>
   </div>
 
+  <div class="modal-body">
+    <p>คุณต้องการลบพนักงาน <span id="deleteEmployeeName" class="fw-bold"></span> ใช่หรือไม่?</p>
+    <p class="text-danger small">หมายเหตุ: การลบพนักงานจะลบข้อมูลออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้</p>
+  </div>
+  
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <!-- Bootstrap JS -->
@@ -427,6 +528,325 @@
         $('#modalTitle').text('เพิ่มพนักงาน');
       }
     });
+
+    // ตัวแปรสำหรับเก็บข้อมูลที่อ่านจากไฟล์
+    let importData = [];
+
+    // สร้างเทมเพลตสำหรับดาวน์โหลด
+    $('#downloadTemplateBtn').on('click', function(e) {
+      e.preventDefault();
+      
+      // สร้างข้อมูลสำหรับไฟล์เทมเพลต CSV
+      const templateData = [
+        ['emp_code', 'full_name', 'position', 'department'],
+        ['001', 'ตัวอย่าง สมชาย', 'เจ้าหน้าที่', 'ธุรการ'],
+        ['002', 'ตัวอย่าง สมหญิง', 'ผู้ช่วย', 'บัญชี'],
+      ];
+      
+      let csvContent = templateData.map(row => row.join(',')).join('\n');
+      
+      // สร้าง Blob จากข้อมูล CSV
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      // สร้าง element สำหรับดาวน์โหลด
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'employee_template.csv');
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // ตรวจสอบข้อมูลเมื่อกดปุ่ม "ตรวจสอบข้อมูล"
+    $('#previewBtn').on('click', function() {
+      const fileInput = document.getElementById('fileImport');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert('กรุณาเลือกไฟล์ Excel หรือ CSV');
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      const fileName = file.name.toLowerCase();
+      
+      // แสดงการโหลด
+      const progressBar = document.getElementById('uploadProgress');
+      progressBar.classList.remove('d-none');
+      document.querySelector('#uploadProgress .progress-bar').style.width = '20%';
+      document.querySelector('#uploadProgress .progress-bar').textContent = '20%';
+      
+      // ตรวจสอบประเภทไฟล์
+      if (fileName.endsWith('.csv')) {
+        // อ่านไฟล์ CSV
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          try {
+            const csvData = e.target.result;
+            
+            // ใช้ PapaParse สำหรับแปลงข้อมูล CSV
+            Papa.parse(csvData, {
+              header: true,
+              skipEmptyLines: true,
+              complete: function(results) {
+                // อัปเดตการโหลด
+                document.querySelector('#uploadProgress .progress-bar').style.width = '100%';
+                document.querySelector('#uploadProgress .progress-bar').textContent = '100%';
+                
+                // แปลงข้อมูลให้เป็นรูปแบบที่ถูกต้อง
+                processImportData(results.data);
+              },
+              error: function(error) {
+                console.error('Error parsing CSV:', error);
+                alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV');
+                progressBar.classList.add('d-none');
+              }
+            });
+          } catch (error) {
+            console.error('Error reading CSV:', error);
+            alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
+            progressBar.classList.add('d-none');
+          }
+        };
+        
+        reader.readAsText(file);
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        // อ่านไฟล์ Excel
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // อัปเดตการโหลด
+            document.querySelector('#uploadProgress .progress-bar').style.width = '60%';
+            document.querySelector('#uploadProgress .progress-bar').textContent = '60%';
+            
+            // ดึงข้อมูลจาก sheet แรก
+            const firstSheet = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheet];
+            
+            // แปลงข้อมูลเป็น JSON
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+            
+            // อัปเดตการโหลด
+            document.querySelector('#uploadProgress .progress-bar').style.width = '100%';
+            document.querySelector('#uploadProgress .progress-bar').textContent = '100%';
+            
+            // แปลงข้อมูลให้เป็นรูปแบบที่ถูกต้อง
+            processImportData(jsonData);
+          } catch (error) {
+            console.error('Error reading Excel:', error);
+            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ Excel');
+            progressBar.classList.add('d-none');
+          }
+        };
+        
+        reader.readAsArrayBuffer(file);
+      } else {
+        alert('กรุณาอัปโหลดไฟล์ Excel (.xlsx, .xls) หรือ CSV (.csv) เท่านั้น');
+        progressBar.classList.add('d-none');
+        return;
+      }
+    });
+
+    // ประมวลผลข้อมูลที่อ่านได้จากไฟล์
+    function processImportData(data) {
+      importData = [];
+      let hasWarning = false;
+      
+      // แปลงข้อมูลเป็นรูปแบบมาตรฐาน
+      data.forEach(row => {
+        const empCode = row.emp_code || row.รหัสพนักงาน || row['รหัส'] || row['EMP CODE'] || '';
+        const fullName = row.full_name || row.ชื่อ || row['ชื่อ-นามสกุล'] || row['ชื่อนามสกุล'] || row.name || '';
+        const position = row.position || row.ตำแหน่ง || row['POSITION'] || '';
+        const department = row.department || row.แผนก || row['DEPARTMENT'] || '';
+        
+        // ข้ามแถวที่ไม่มีรหัสหรือชื่อพนักงาน
+        if (empCode.trim() && fullName.trim()) {
+          importData.push({
+            emp_code: empCode.trim(),
+            full_name: fullName.trim(),
+            position: position.trim(),
+            department: department.trim(),
+            status: 'active'
+          });
+        } else {
+          hasWarning = true;
+        }
+      });
+      
+      // แสดงตัวอย่างข้อมูล
+      showDataPreview(importData, hasWarning);
+    }
+
+    // แสดงตัวอย่างข้อมูลที่จะนำเข้า
+    function showDataPreview(data, hasWarning) {
+      const previewArea = document.getElementById('previewArea');
+      const previewBody = document.getElementById('previewBody');
+      const totalRecords = document.getElementById('totalRecords');
+      const previewWarning = document.getElementById('previewWarning');
+      const importBtn = document.getElementById('importBtn');
+      const progressBar = document.getElementById('uploadProgress');
+      
+      // ซ่อนการโหลด
+      progressBar.classList.add('d-none');
+      
+      // ล้างข้อมูลเดิม
+      previewBody.innerHTML = '';
+      
+      // ตรวจสอบว่ามีข้อมูลหรือไม่
+      if (data.length === 0) {
+        alert('ไม่พบข้อมูลที่จะนำเข้า โปรดตรวจสอบรูปแบบไฟล์');
+        return;
+      }
+      
+      // แสดงข้อมูลตัวอย่าง (10 แถวแรก)
+      const previewData = data.slice(0, 10);
+      
+      previewData.forEach(row => {
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
+          <td>${row.emp_code}</td>
+          <td>${row.full_name}</td>
+          <td>${row.position || '-'}</td>
+          <td>${row.department || '-'}</td>
+          <td>${row.status || 'active'}</td>
+        `;
+        
+        previewBody.appendChild(tr);
+      });
+      
+      // แสดงจำนวนรายการทั้งหมด
+      totalRecords.textContent = `พบข้อมูลทั้งหมด ${data.length} รายการ`;
+      
+      // แสดงคำเตือนถ้ามีข้อมูลที่ไม่สมบูรณ์
+      if (hasWarning) {
+        previewWarning.style.display = 'block';
+        previewWarning.textContent = 'คำเตือน: มีบางรายการที่ไม่มีรหัสพนักงานหรือชื่อพนักงาน ซึ่งจะถูกข้ามไป';
+      } else {
+        previewWarning.style.display = 'none';
+      }
+      
+      // แสดงพื้นที่แสดงตัวอย่างและปุ่มนำเข้า
+      previewArea.classList.remove('d-none');
+      importBtn.classList.remove('d-none');
+      
+      // ซ่อนส่วนแสดงผลการนำเข้า
+      document.getElementById('importResult').classList.add('d-none');
+      document.getElementById('importSuccess').style.display = 'none';
+      document.getElementById('importWarning').style.display = 'none';
+      document.getElementById('importError').style.display = 'none';
+    }
+
+    // การนำเข้าข้อมูล
+    $('#importBtn').on('click', async function() {
+      if (importData.length === 0) {
+        alert('ไม่มีข้อมูลที่จะนำเข้า');
+        return;
+      }
+      
+      // แสดงการโหลด
+      const progressBar = document.getElementById('uploadProgress');
+      progressBar.classList.remove('d-none');
+      
+      // ดึงค่าตัวเลือกการข้ามรายการซ้ำ
+      const skipExisting = document.getElementById('skipExistingCheck').checked;
+      
+      try {
+        // ส่งข้อมูลไปยัง API
+        const response = await fetch('/api/admin/import-employees', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            employees: importData,
+            skipExisting: skipExisting
+          })
+        });
+        
+        const result = await response.json();
+        
+        // แสดงผลการนำเข้า
+        showImportResult(result);
+        
+        // โหลดข้อมูลพนักงานใหม่
+        loadEmployees();
+      } catch (error) {
+        console.error('Error importing employees:', error);
+        alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ' + error.message);
+        progressBar.classList.add('d-none');
+      }
+    });
+
+    // แสดงผลการนำเข้า
+    function showImportResult(result) {
+      const progressBar = document.getElementById('uploadProgress');
+      progressBar.classList.add('d-none');
+      
+      const importResult = document.getElementById('importResult');
+      const importSuccess = document.getElementById('importSuccess');
+      const importWarning = document.getElementById('importWarning');
+      const importError = document.getElementById('importError');
+      const importSuccessCount = document.getElementById('importSuccessCount');
+      const importSkippedCount = document.getElementById('importSkippedCount');
+      const importErrorCount = document.getElementById('importErrorCount');
+      const importErrorList = document.getElementById('importErrorList');
+      
+      // แสดงส่วนผลลัพธ์
+      importResult.classList.remove('d-none');
+      
+      if (result.success) {
+        // แสดงจำนวนที่นำเข้าสำเร็จ
+        if (result.imported > 0) {
+          importSuccess.style.display = 'block';
+          importSuccessCount.textContent = result.imported;
+        } else {
+          importSuccess.style.display = 'none';
+        }
+        
+        // แสดงจำนวนที่ข้ามไป
+        if (result.skipped > 0) {
+          importWarning.style.display = 'block';
+          importSkippedCount.textContent = result.skipped;
+        } else {
+          importWarning.style.display = 'none';
+        }
+        
+        // แสดงรายการที่มีข้อผิดพลาด
+        if (result.errors && result.errors.length > 0) {
+          importError.style.display = 'block';
+          importErrorCount.textContent = result.errors.length;
+          
+          importErrorList.innerHTML = '';
+          result.errors.forEach(error => {
+            const li = document.createElement('li');
+            li.textContent = `รหัส ${error.emp_code}, ชื่อ ${error.full_name}: ${
+            error.error}`;
+            importErrorList.appendChild(li);
+          });
+        } else {
+          importError.style.display = 'none';
+        }
+      } else {
+        // กรณีเกิดข้อผิดพลาดทั้งหมด
+        importSuccess.style.display = 'none';
+        importWarning.style.display = 'none';
+        importError.style.display = 'block';
+        importErrorCount.textContent = '1';
+        
+        importErrorList.innerHTML = '';
+        const li = document.createElement('li');
+        li.textContent = result.message || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+        importErrorList.appendChild(li);
+      }
+    }
   </script>
 </body>
 </html>
