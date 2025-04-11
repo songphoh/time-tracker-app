@@ -154,13 +154,47 @@
         </div>
       </div>
 
-      <div class="mb-3">
-        <label for="time_offset" class="form-label">ค่าชดเชยเวลา (นาที)</label>
-        <div class="input-group">
-          <input type="number" class="form-control" id="time_offset" name="time_offset" value="0">
-          <span class="input-group-text">นาที</span>
+      <div class="col-lg-6 col-md-12">
+        <div class="mb-3">
+          <label for="time_offset" class="form-label">ค่าชดเชยเวลา (นาที)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" id="time_offset" name="time_offset" value="0">
+            <span class="input-group-text">นาที</span>
+          </div>
+          <div class="form-text">กำหนดค่าชดเชยเวลา: 0 = เวลาปกติ, เป็นบวก = เร็วกว่าความเป็นจริง, เป็นลบ = ช้ากว่าความเป็นจริง</div>
         </div>
-        <div class="form-text">กำหนดค่าชดเชยเวลา: 0 = เวลาปกติ, เป็นบวก = เร็วกว่าความเป็นจริง, เป็นลบ = ช้ากว่าความเป็นจริง</div>
+      </div>
+
+      <!-- ตั้งค่า Google Apps Script -->
+      <div class="col-lg-6 col-md-12">
+        <div class="card settings-card">
+          <div class="card-header bg-white">
+            <div class="d-flex align-items-center">
+              <div class="settings-icon bg-success bg-opacity-10 text-success me-3">
+                <i class="fas fa-cloud"></i>
+              </div>
+              <h5 class="mb-0">ตั้งค่า Google Apps Script</h5>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="gas_web_app_url" class="form-label">Google Apps Script URL</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="gas_web_app_url" name="gas_web_app_url">
+                <button class="btn btn-outline-success" type="button" id="test-gas-btn">ทดสอบ</button>
+              </div>
+              <div class="form-text">URL ที่ได้จากการ Deploy เป็น Web App (รูปแบบ: https://script.google.com/macros/s/XXXX/exec)</div>
+            </div>
+            
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="use_gas_for_telegram" name="use_gas_for_telegram" value="1" checked>
+                <label class="form-check-label" for="use_gas_for_telegram">ใช้ Google Apps Script ในการสร้างแผนที่และส่งข้อความไป Telegram</label>
+              </div>
+              <div class="form-text">เมื่อเปิดใช้งาน ระบบจะส่งข้อมูลไปยัง Google Apps Script เพื่อสร้างแผนที่และส่งข้อความไป Telegram แทนการส่งโดยตรง</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ตั้งค่า Telegram -->
@@ -355,6 +389,40 @@
     </div>
   </div>
   
+  <!-- Modal ทดสอบการส่งข้อความผ่าน Google Apps Script -->
+  <div class="modal fade" id="testGasModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">ทดสอบการส่งข้อความผ่าน Google Apps Script</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="test_gas_group" class="form-label">กลุ่มที่ต้องการทดสอบ</label>
+            <select class="form-select" id="test_gas_group">
+              <!-- กลุ่มจะถูกเพิ่มด้วย JavaScript -->
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="test_gas_message" class="form-label">ข้อความทดสอบ</label>
+            <textarea class="form-control" id="test_gas_message" rows="3">ทดสอบการส่งข้อความผ่าน Google Apps Script</textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="test_gas_with_location" checked>
+            <label class="form-check-label" for="test_gas_with_location">
+              ทดสอบพร้อมแผนที่ (ใช้พิกัดกรุงเทพฯ)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-success" id="send-test-gas-btn">ส่งข้อความ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <!-- Modal แจ้งผลลัพธ์ -->
   <div class="modal fade" id="resultModal" tabindex="-1">
     <div class="modal-dialog">
@@ -458,7 +526,7 @@
         showResult('สำเร็จ', 'บันทึกข้อมูลกลุ่มเรียบร้อยแล้ว', 'success');
       });
       
-      // เมื่อคลิกปุ่มทดสอบการแจ้งเตือน
+      // เมื่อคลิกปุ่มทดสอบการแจ้งเตือน Telegram
       $('#test-notify-btn').on('click', function() {
         const token = $('#telegram_bot_token').val();
         if (!token) {
@@ -473,7 +541,7 @@
         testModal.show();
       });
       
-      // เมื่อคลิกปุ่มส่งข้อความทดสอบ
+      // เมื่อคลิกปุ่มส่งข้อความทดสอบ Telegram
       $('#send-test-notify-btn').on('click', function() {
         const token = $('#telegram_bot_token').val();
         const chatId = $('#test_notify_group').val();
@@ -515,6 +583,74 @@
         });
       });
       
+      // เมื่อคลิกปุ่มทดสอบ Google Apps Script
+      $('#test-gas-btn').on('click', function() {
+        const gasUrl = $('#gas_web_app_url').val();
+        if (!gasUrl) {
+          showResult('ข้อผิดพลาด', 'กรุณากรอก Google Apps Script URL ก่อนทดสอบ', 'danger');
+          return;
+        }
+        
+        // อัปเดตรายการกลุ่มใน dropdown
+        updateTestGasGroupDropdown();
+        
+        const testModal = new bootstrap.Modal(document.getElementById('testGasModal'));
+        testModal.show();
+      });
+      
+      // เมื่อคลิกปุ่มส่งข้อความทดสอบผ่าน Google Apps Script
+      $('#send-test-gas-btn').on('click', function() {
+        const gasUrl = $('#gas_web_app_url').val();
+        const token = $('#telegram_bot_token').val();
+        const chatId = $('#test_gas_group').val();
+        const message = $('#test_gas_message').val();
+        const withLocation = $('#test_gas_with_location').is(':checked');
+        
+        if (!chatId) {
+          showResult('ข้อผิดพลาด', 'กรุณาเลือกกลุ่มที่ต้องการทดสอบ', 'danger');
+          return;
+        }
+        
+        if (!message) {
+          showResult('ข้อผิดพลาด', 'กรุณากรอกข้อความทดสอบ', 'danger');
+          return;
+        }
+        
+        // ปิด Modal ทดสอบ
+        $('#testGasModal').modal('hide');
+        
+        // เตรียมข้อมูลสำหรับทดสอบ
+        const testData = {
+          message: message,
+          token: token,
+          chatId: chatId
+        };
+        
+        // เพิ่มพิกัดถ้าเลือกทดสอบพร้อมแผนที่
+        if (withLocation) {
+          testData.lat = "13.7563"; // พิกัดกรุงเทพฯ
+          testData.lon = "100.5018"; // พิกัดกรุงเทพฯ
+        }
+        
+        // ส่งข้อความทดสอบผ่าน API
+        $.ajax({
+          url: '/api/admin/test-gas',
+          type: 'POST',
+          data: JSON.stringify(testData),
+          contentType: 'application/json',
+          success: function(response) {
+            if (response.success) {
+              showResult('สำเร็จ', 'ส่งข้อความทดสอบเรียบร้อยแล้ว กรุณาตรวจสอบที่กลุ่ม Telegram', 'success');
+            } else {
+              showResult('ข้อผิดพลาด', 'ไม่สามารถส่งข้อความได้: ' + (response.message || 'โปรดตรวจสอบ URL, Token และ Chat ID'), 'danger');
+            }
+          },
+          error: function() {
+            showResult('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'danger');
+          }
+        });
+      });
+      
       // เมื่อคลิกปุ่มบันทึกการตั้งค่าทั้งหมด
       $('#save-all-btn').on('click', function() {
         saveAllSettings();
@@ -526,7 +662,7 @@
         sessionStorage.removeItem('admin_logged_in');
         window.location.href = '/admin/index.html';
       });
-
+      
       // ฟังก์ชันโหลดการตั้งค่า
       function loadSettings() {
         $.ajax({
@@ -545,9 +681,14 @@
               $('#work_start_time').val(settings.work_start_time || '08:30');
               $('#work_end_time').val(settings.work_end_time || '16:30');
               $('#allowed_ip').val(settings.allowed_ip || '');
+              $('#time_offset').val(settings.time_offset || '420');
               
               $('#telegram_bot_token').val(settings.telegram_bot_token || '');
               $('#liff_id').val(settings.liff_id || '');
+              
+              // กำหนดค่า Google Apps Script
+              $('#gas_web_app_url').val(settings.gas_web_app_url || '');
+              $('#use_gas_for_telegram').prop('checked', settings.use_gas_for_telegram !== '0');
               
               // สร้าง input hidden สำหรับเก็บข้อมูลกลุ่ม Telegram
               if (!$('#telegram_groups').length) {
@@ -601,12 +742,12 @@
                   ${group.active ? 'ใช้งาน' : 'ปิดใช้งาน'}
                 </span>
               </h6>
-<div class="small text-muted">Chat ID: ${group.chat_id}</div>
-          <div class="mt-2">
-            <button class="btn btn-sm btn-outline-primary edit-group-btn" data-index="${index}">
-              <i class="fas fa-edit me-1"></i> แก้ไข
-            </button>
-          </div>
+              <div class="small text-muted">Chat ID: ${group.chat_id}</div>
+              <div class="mt-2">
+                <button class="btn btn-sm btn-outline-primary edit-group-btn" data-index="${index}">
+                  <i class="fas fa-edit me-1"></i> แก้ไข
+                </button>
+              </div>
             </div>
           `;
           container.append(groupHtml);
@@ -663,9 +804,37 @@
         }
       }
       
-      // ฟังก์ชันอัปเดตรายการกลุ่มใน dropdown สำหรับทดสอบ
+      // ฟังก์ชันอัปเดตรายการกลุ่มใน dropdown สำหรับทดสอบ Telegram
       function updateTestGroupDropdown() {
         const select = $('#test_notify_group');
+        select.empty();
+        
+        try {
+          const groups = JSON.parse($('#telegram_groups').val() || '[]');
+          
+          if (groups.length === 0) {
+            select.append('<option value="">-- ไม่มีกลุ่ม --</option>');
+            return;
+          }
+          
+          groups.forEach((group, index) => {
+            if (group.active) {
+              select.append(`<option value="${group.chat_id}">${group.name}</option>`);
+            }
+          });
+          
+          if (select.find('option').length === 0) {
+            select.append('<option value="">-- ไม่มีกลุ่มที่เปิดใช้งาน --</option>');
+          }
+        } catch (e) {
+          console.error('Error updating test group dropdown:', e);
+          select.append('<option value="">-- ไม่สามารถโหลดข้อมูลกลุ่มได้ --</option>');
+        }
+      }
+      
+      // ฟังก์ชันอัปเดตรายการกลุ่มใน dropdown สำหรับทดสอบ Google Apps Script
+      function updateTestGasGroupDropdown() {
+        const select = $('#test_gas_group');
         select.empty();
         
         try {
@@ -748,14 +917,19 @@
           { name: 'work_start_time', value: $('#work_start_time').val() },
           { name: 'work_end_time', value: $('#work_end_time').val() },
           { name: 'allowed_ip', value: $('#allowed_ip').val() },
+          { name: 'time_offset', value: $('#time_offset').val() },
           
           { name: 'telegram_bot_token', value: $('#telegram_bot_token').val() },
           { name: 'telegram_groups', value: $('#telegram_groups').val() },
           { name: 'notify_clock_in', value: $('#notify_clock_in').is(':checked') ? '1' : '0' },
           { name: 'notify_clock_out', value: $('#notify_clock_out').is(':checked') ? '1' : '0' },
-          { name: 'time_offset', value: $('#time_offset').val() },
           
-          { name: 'admin_username', value: $('#admin_username').val() }
+          { name: 'admin_username', value: $('#admin_username').val() },
+          { name: 'liff_id', value: $('#liff_id').val() },
+          
+          // เพิ่มการตั้งค่า Google Apps Script
+          { name: 'gas_web_app_url', value: $('#gas_web_app_url').val() },
+          { name: 'use_gas_for_telegram', value: $('#use_gas_for_telegram').is(':checked') ? '1' : '0' }
         ];
         
         // เพิ่มรหัสผ่านเฉพาะเมื่อมีการกรอก
