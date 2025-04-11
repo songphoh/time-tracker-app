@@ -5,18 +5,19 @@ var owner = 'หน่วยงานราชการ';
 // ตัวแปรสำหรับเก็บข้อมูลโปรไฟล์และพิกัด
 var profile = null;
 var gps;
-
-// เริ่มดึงตำแหน่ง GPS
-$.when(getlocation()).done(function (res) {
-  console.log(res);
-  console.log(gps);
-});
+var locationPermissionGranted = false; // เพิ่มตัวแปรสถานะการอนุญาตใช้ตำแหน่ง
 
 // เมื่อโหลดหน้าเสร็จ
 $(document).ready(function () {
   // กำหนดการทำงานของปุ่ม
-  $('#clockin').click(() => ClockIn());
-  $('#clockout').click(() => ClockOut());
+  $('#clockin').click(() => requestLocationAndClockIn());
+  $('#clockout').click(() => requestLocationAndClockOut());
+  
+  // แสดงเวลา
+  showTime();
+  
+  // เริ่มดึงตำแหน่ง GPS แต่ไม่บังคับ (จะแสดง UI สวยงามตอนกดปุ่มลงเวลา)
+  getlocation(false);
 
   // ดึง LIFF ID จากฐานข้อมูล
   $.ajax({
@@ -161,10 +162,160 @@ function getClientTime() {
   return isoString;
 }
 
-// แก้ไขฟังก์ชัน ClockIn
-async function ClockIn() {
+// ฟังก์ชันขอตำแหน่งทางภูมิศาสตร์ก่อนลงเวลาเข้า
+function requestLocationAndClockIn() {
   event.preventDefault();
+  var employee = document.getElementById("employee").value;
   
+  if (employee === '') {
+    $('#message').html('กรุณาเลือกรายชื่อพนักงาน ...!');
+    document.getElementById('message').className = 'alert alert-warning text-danger';
+    return;
+  }
+  
+  // แสดงกล่องขออนุญาตใช้ตำแหน่ง
+  showLocationPermissionDialog(function(allowed) {
+    if (allowed) {
+      // ดึงตำแหน่งปัจจุบันก่อนลงเวลา
+      getlocation(true, function(success) {
+        if (success) {
+          // ดำเนินการลงเวลาเข้าเมื่อได้ตำแหน่งแล้ว
+          ClockIn();
+        } else {
+          $('#message').html('ไม่สามารถดึงตำแหน่งพิกัดได้ กรุณาตรวจสอบการตั้งค่าอุปกรณ์ของคุณ');
+          document.getElementById('message').className = 'alert alert-danger';
+        }
+      });
+    } else {
+      // กรณีไม่อนุญาตใช้ตำแหน่ง
+      $('#message').html('คุณไม่อนุญาตการใช้งานตำแหน่งที่ตั้ง การลงเวลาจะไม่มีข้อมูลพิกัด');
+      document.getElementById('message').className = 'alert alert-warning';
+      
+      // ลงเวลาแม้ไม่มีพิกัด
+      setTimeout(function() {
+        ClockIn();
+      }, 1500);
+    }
+  });
+}
+
+// ฟังก์ชันขอตำแหน่งทางภูมิศาสตร์ก่อนลงเวลาออก
+function requestLocationAndClockOut() {
+  event.preventDefault();
+  var employee = document.getElementById("employee").value;
+  
+  if (employee === '') {
+    $('#message').html('กรุณาเลือกรายชื่อพนักงาน ...!');
+    document.getElementById('message').className = 'alert alert-warning text-danger';
+    return;
+  }
+  
+  // แสดงกล่องขออนุญาตใช้ตำแหน่ง
+  showLocationPermissionDialog(function(allowed) {
+    if (allowed) {
+      // ดึงตำแหน่งปัจจุบันก่อนลงเวลา
+      getlocation(true, function(success) {
+        if (success) {
+          // ดำเนินการลงเวลาออกเมื่อได้ตำแหน่งแล้ว
+          ClockOut();
+        } else {
+          $('#message').html('ไม่สามารถดึงตำแหน่งพิกัดได้ กรุณาตรวจสอบการตั้งค่าอุปกรณ์ของคุณ');
+          document.getElementById('message').className = 'alert alert-danger';
+        }
+      });
+    } else {
+      // กรณีไม่อนุญาตใช้ตำแหน่ง
+      $('#message').html('คุณไม่อนุญาตการใช้งานตำแหน่งที่ตั้ง การลงเวลาจะไม่มีข้อมูลพิกัด');
+      document.getElementById('message').className = 'alert alert-warning';
+      
+      // ลงเวลาแม้ไม่มีพิกัด
+      setTimeout(function() {
+        ClockOut();
+      }, 1500);
+    }
+  });
+}
+
+// ฟังก์ชันแสดงกล่องขออนุญาตใช้ตำแหน่งแบบสวยงาม
+function showLocationPermissionDialog(callback) {
+  // ถ้าเคยอนุญาตแล้ว ไม่ต้องแสดงกล่องอีก
+  if (locationPermissionGranted) {
+    callback(true);
+    return;
+  }
+  
+  // สร้าง Modal dialog สำหรับขออนุญาตใช้ตำแหน่ง
+  var modalHtml = `
+  <div class="modal fade" id="locationPermissionModal" tabindex="-1" role="dialog" aria-labelledby="locationPermissionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="locationPermissionModalLabel">
+            <i class="fas fa-map-marker-alt mr-2"></i> ขออนุญาตใช้ตำแหน่งที่ตั้ง
+          </h5>
+          <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="text-center mb-4">
+            <img src="https://cdn-icons-png.flaticon.com/512/4781/4781517.png" alt="Location" style="width: 100px; height: 100px;">
+          </div>
+          <p class="lead text-center">ระบบต้องการเข้าถึงตำแหน่งที่ตั้งของคุณเพื่อบันทึกพิกัดการลงเวลา</p>
+          <p class="text-muted text-center">ข้อมูลนี้จะถูกใช้เพื่อยืนยันตำแหน่งที่คุณลงเวลาเท่านั้น</p>
+        </div>
+        <div class="modal-footer justify-content-center">
+          <button type="button" class="btn btn-secondary px-4" data-dismiss="modal" id="denyLocationBtn">
+            <i class="fas fa-times mr-2"></i> ไม่อนุญาต
+          </button>
+          <button type="button" class="btn btn-primary px-4" id="allowLocationBtn">
+            <i class="fas fa-check mr-2"></i> อนุญาต
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
+  
+  // เพิ่ม Modal เข้าไปใน body
+  $('body').append(modalHtml);
+  
+  // แสดง Modal
+  $('#locationPermissionModal').modal({
+    backdrop: 'static',
+    keyboard: false
+  });
+  
+  // จัดการเมื่อกดปุ่มอนุญาต
+  $('#allowLocationBtn').on('click', function() {
+    $('#locationPermissionModal').modal('hide');
+    locationPermissionGranted = true;
+    setTimeout(function() {
+      $('#locationPermissionModal').remove();
+      callback(true);
+    }, 300);
+  });
+  
+  // จัดการเมื่อกดปุ่มไม่อนุญาต
+  $('#denyLocationBtn').on('click', function() {
+    $('#locationPermissionModal').modal('hide');
+    setTimeout(function() {
+      $('#locationPermissionModal').remove();
+      callback(false);
+    }, 300);
+  });
+  
+  // จัดการเมื่อปิด Modal โดยวิธีอื่น
+  $('#locationPermissionModal').on('hidden.bs.modal', function() {
+    setTimeout(function() {
+      $('#locationPermissionModal').remove();
+      callback(false);
+    }, 300);
+  });
+}
+
+// ปรับปรุงฟังก์ชัน ClockIn
+function ClockIn() {
   var employee = document.getElementById("employee").value;
   var userinfo = document.getElementById("userinfo").value;
 
@@ -254,10 +405,8 @@ async function ClockIn() {
   }
 }
 
-// แก้ไขฟังก์ชัน ClockOut
-async function ClockOut() {
-  event.preventDefault();
-  
+// ปรับปรุงฟังก์ชัน ClockOut
+function ClockOut() {
   var employee = document.getElementById("employee").value;
 
   if (employee != '') {
@@ -345,42 +494,94 @@ async function ClockOut() {
   }
 }
 
-// ฟังก์ชันดึงตำแหน่ง GPS
-function getlocation() {
+// ปรับปรุงฟังก์ชันดึงตำแหน่ง GPS
+function getlocation(forceUpdate = false, callback = null) {
+  // ถ้าไม่ได้บังคับอัปเดต และมีพิกัดอยู่แล้ว ให้ใช้ค่าเดิม
+  if (!forceUpdate && gps) {
+    console.log("Using cached GPS coordinates:", gps);
+    if (callback) callback(true);
+    return;
+  }
+  
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(showPosition, getLocationFromApi);
+    navigator.geolocation.getCurrentPosition(
+      // กรณีสำเร็จ
+      function(position) {
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        gps = [lat, lon];
+        console.log("Geolocation success - Latitude: " + lat + ", Longitude: " + lon);
+        
+        // อัปเดตสถานะการอนุญาตใช้ตำแหน่ง
+        locationPermissionGranted = true;
+        
+        if (callback) callback(true);
+      },
+      // กรณีไม่สำเร็จ
+      function(error) {
+        console.error("Geolocation error:", error);
+        
+        // ลองใช้วิธีสำรอง
+        try {
+          getLocationFromApi(function(success) {
+            if (success) {
+              console.log("Got location from API:", gps);
+              if (callback) callback(true);
+            } else {
+              // หากไม่สามารถดึงตำแหน่งได้จากทุกวิธี
+              console.error("Failed to get location from all methods");
+              if (callback) callback(false);
+            }
+          });
+        } catch (err) {
+          console.error("Error getting location from API:", err);
+          if (callback) callback(false);
+        }
+      },
+      // ตัวเลือกการดึงตำแหน่ง
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
   } else {
-    console.log("Geolocation is not supported by this browser.");
+    console.error("Geolocation is not supported by this browser.");
+    
+    // ลองใช้วิธีสำรอง
+    try {
+      getLocationFromApi(function(success) {
+        if (success) {
+          console.log("Got location from API as fallback:", gps);
+          if (callback) callback(true);
+        } else {
+          console.error("Failed to get location from API fallback");
+          if (callback) callback(false);
+        }
+      });
+    } catch (err) {
+      console.error("Error getting location from API fallback:", err);
+      if (callback) callback(false);
+    }
   }
 }
 
-// ฟังก์ชันเมื่อดึงตำแหน่ง GPS สำเร็จ
-function showPosition(position) {
-  var lat = position.coords.latitude;
-  var lon = position.coords.longitude;
-  gps = [lat, lon];
-  console.log("🚀 ~ gps:", gps);
-  console.log("Latitude: " + lat + " Longitude: " + lon);
-}
-
-// ฟังก์ชันดึงตำแหน่งจากพารามิเตอร์ URL
-function getLocationFromParameter() {
-  var url = new URL(window.location.href);
-  var lat = url.searchParams.get("lat");
-  var lon = url.searchParams.get("lon");
-  gps = [lat, lon];
-  console.log("Latitude: " + lat + " Longitude: " + lon);
-}
-
-// ฟังก์ชันดึงตำแหน่งจาก API (กรณีไม่สามารถใช้ Geolocation)
-function getLocationFromApi() {
-  $.getJSON('https://ipapi.co/json/', function (data) {
-    var lat = data.latitude;
-    var lon = data.longitude;
-    gps = [lat, lon];
-    console.log("Latitude: " + lat + " Longitude: " + lon);
-    return gps;
-  });
+// ปรับปรุงฟังก์ชัน getLocationFromApi ให้รองรับ callback
+function getLocationFromApi(callback = null) {
+  $.getJSON('https://ipapi.co/json/')
+    .done(function(data) {
+      var lat = data.latitude;
+      var lon = data.longitude;
+      gps = [lat, lon];
+      console.log("IP API Location - Latitude: " + lat + ", Longitude: " + lon);
+      if (callback) callback(true);
+      return true;
+    })
+    .fail(function(jqxhr, textStatus, error) {
+      console.error("Error fetching location from IP API:", error);
+      if (callback) callback(false);
+      return false;
+    });
 }
 
 // ฟังก์ชันล้างฟอร์ม
@@ -420,6 +621,3 @@ function showTime() {
   // เรียกฟังก์ชันนี้ทุก 1 วินาที
   setTimeout(showTime, 1000);
 }
-
-// เริ่มแสดงเวลาเมื่อโหลดหน้า
-showTime();
