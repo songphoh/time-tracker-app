@@ -1145,13 +1145,13 @@ app.delete('/api/admin/employees/:id', async (req, res) => {
     
     const employee = employeeResult.rows[0];
     
-    // ลบพนักงาน (soft delete โดยเปลี่ยนสถานะเป็น inactive)
+    // ลบพนักงาน
     await pool.query(
-      'UPDATE employees SET status = $1 WHERE id = $2',
-      ['inactive', id]
+      'DELETE FROM employees WHERE id = $1',
+      [id]
     );
     
-    console.log('Deleted (set inactive) employee with ID:', id, '(', employee.full_name, ')');
+    console.log('Permanently deleted employee with ID:', id, '(', employee.full_name, ')');
     res.json({ success: true, message: 'ลบพนักงานเรียบร้อยแล้ว' });
   } catch (error) {
     console.error('Error deleting employee:', error);
@@ -1718,6 +1718,128 @@ app.get('/api/getTimeOffset', async (req, res) => {
   } catch (error) {
     console.error('Error getting time offset:', error);
     return res.json({ success: false, error: error.message });
+  }
+});
+
+// API - นำเข้ารายชื่อพนักงานจาก Excel/CSV
+app.post('/api/admin/import-employees', async (req, res) => {
+  console.log('API: admin/import-employees - นำเข้ารายชื่อพนักงานจากไฟล์', req.body);
+  
+  try {
+    const { employees, skipExisting } = req.body;
+    
+    if (!Array.isArray(employees) || employees.length === 0) {
+      return res.json({ success: false, message: 'ไม่มีข้อมูลที่จะนำเข้า' });
+    }
+    
+    // ตรวจสอบว่าข้อมูลมีรูปแบบถูกต้องหรือไม่
+    for (const emp of employees) {
+      if (!emp.emp_code || !emp.full_name) {
+        return res.json({ 
+          success: false, 
+          message: 'ข้อมูลไม่ถูกต้อง ต้องมีรหัสพนักงานและชื่อพนักงาน' 
+        });
+      }
+    }
+    
+    // เตรียมข้อมูลสำหรับส่งกลับ
+    const result = {
+      success: true,
+      total: employees.length,
+      imported: 0,
+      skipped: 0,
+      errors: []
+    };
+    
+    // เริ่มการนำเข้าข้อมูล
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      for (const emp of employees) {
+        try {
+          // ตรวจสอบว่ามีรหัสพนักงานนี้ในระบบแล้วหรือไม่
+          const checkResult = await client.query(
+            'SELECT id FROM employees WHERE emp_code = $1',
+            [emp.emp_code]
+          );
+          
+          if (checkResult.rows.length > 0) {
+            // ถ้ามีรหัสพนักงานนี้แล้ว
+            if (skipExisting) {
+              // ข้ามรายการนี้ถ้าตั้งค่าให้ข้าม
+              result.skipped++;
+              continue;
+            } else {
+              // อัปเดตข้อมูลพนักงานถ้าไม่ข้าม
+              await client.query(
+                `UPDATE employees 
+                 SET full_name = $1, position = $2, department = $3, status = $4
+                 WHERE emp_code = $5`,
+                [
+                  emp.full_name,
+                  emp.position || null,
+                  emp.department || null,
+                  emp.status || 'active',
+                  emp.emp_code
+                ]
+              );
+              
+              result.imported++;
+            }
+          } else {
+            // เพิ่มพนักงานใหม่
+            await client.query(
+              `INSERT INTO employees 
+               (emp_code, full_name, position, department, status)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [
+                emp.emp_code,
+                emp.full_name,
+                emp.position || null,
+                emp.department || null,
+                emp.status || 'active'
+              ]
+            );
+            
+            result.imported++;
+          }
+        } catch (error) {
+          console.error('Error importing employee:', emp, error);
+          
+          // เก็บข้อผิดพลาดสำหรับรายการนี้
+          result.errors.push({
+            emp_code: emp.emp_code,
+            full_name: emp.full_name,
+            error: error.message
+          });
+        }
+      }
+      
+      // บันทึกการเปลี่ยนแปลงทั้งหมด
+      await client.query('COMMIT');
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error in transaction:', error);
+      
+      return res.json({
+        success: false,
+        message: 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ' + error.message
+      });
+    } finally {
+      client.release();
+    }
+    
+    console.log('Import result:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error importing employees:', error);
+    res.json({
+      success: false,
+      message: 'เกิดข้อผิดพลาด: ' + error.message
+    });
   }
 });
 
