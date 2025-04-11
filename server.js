@@ -726,7 +726,7 @@ app.post('/api/admin/test-gas', async (req, res) => {
       error: error.response?.data || error.message
     });
   }
-}
+});
 
 // ปรับปรุงฟังก์ชัน initializeDatabase เพื่อเพิ่ม setting สำหรับ GAS URL
 async function initializeDatabase() {
