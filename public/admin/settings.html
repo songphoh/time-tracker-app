@@ -606,6 +606,11 @@
         const message = $('#test_gas_message').val();
         const withLocation = $('#test_gas_with_location').is(':checked');
         
+        if (!gasUrl) {
+          showResult('ข้อผิดพลาด', 'กรุณากรอก Google Apps Script URL', 'danger');
+          return;
+        }
+        
         if (!chatId) {
           showResult('ข้อผิดพลาด', 'กรุณาเลือกกลุ่มที่ต้องการทดสอบ', 'danger');
           return;
@@ -623,7 +628,8 @@
         const testData = {
           message: message,
           token: token,
-          chatId: chatId
+          chatId: chatId,
+          gasUrl: gasUrl // เพิ่ม URL เข้าไปในข้อมูลที่ส่ง
         };
         
         // เพิ่มพิกัดถ้าเลือกทดสอบพร้อมแผนที่
@@ -632,6 +638,12 @@
           testData.lon = "100.5018"; // พิกัดกรุงเทพฯ
         }
         
+        // แสดงข้อความกำลังทดสอบ
+        $('#resultModalTitle').text('กำลังทดสอบ');
+        $('#resultModalBody').html('<div class="alert alert-info">กำลังส่งข้อความทดสอบ กรุณารอสักครู่...</div>');
+        const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+        resultModal.show();
+        
         // ส่งข้อความทดสอบผ่าน API
         $.ajax({
           url: '/api/admin/test-gas',
@@ -639,6 +651,7 @@
           data: JSON.stringify(testData),
           contentType: 'application/json',
           success: function(response) {
+            resultModal.hide();
             if (response.success) {
               showResult('สำเร็จ', 'ส่งข้อความทดสอบเรียบร้อยแล้ว กรุณาตรวจสอบที่กลุ่ม Telegram', 'success');
             } else {
@@ -646,6 +659,7 @@
             }
           },
           error: function() {
+            resultModal.hide();
             showResult('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'danger');
           }
         });
