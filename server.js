@@ -516,7 +516,7 @@ app.post('/api/sendnotify', async (req, res) => {
   }
 });
 
-// เปลี่ยนฟังก์ชัน sendTelegramToAllGroups ให้ส่งข้อมูลไปยัง GSA แทน
+// ฟังก์ชัน sendTelegramToAllGroups ให้ส่งข้อมูลไปยัง GSA 
 async function sendTelegramToAllGroups(message, lat, lon, employee) {
   try {
     // ดึง token และ URL ของ GSA
@@ -534,18 +534,9 @@ async function sendTelegramToAllGroups(message, lat, lon, employee) {
     let gasUrl = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
     
     if (gasUrlResult.rows.length > 0 && gasUrlResult.rows[0].setting_value) {
-      gasUrl = gasUrlResult.rows[0].setting_value;
+      gasUrl = gasUrlResult.rows[0].setting_value.trim(); // เพิ่ม .trim() เพื่อตัดช่องว่าง
     } else {
       console.log('ไม่พบ URL ของ GSA ในฐานข้อมูล ใช้ค่าเริ่มต้น');
-      // บันทึก URL เริ่มต้นลงฐานข้อมูล
-      try {
-        await pool.query(
-          'INSERT INTO settings (setting_name, setting_value, description) VALUES ($1, $2, $3) ON CONFLICT (setting_name) DO UPDATE SET setting_value = $2',
-          ['gas_web_app_url', gasUrl, 'URL ของ Google Apps Script Web App']
-        );
-      } catch (error) {
-        console.error('Error saving default GAS URL:', error.message);
-      }
     }
     
     if (tokenResult.rows.length === 0 || !tokenResult.rows[0].setting_value) {
@@ -575,26 +566,34 @@ async function sendTelegramToAllGroups(message, lat, lon, employee) {
           try {
             console.log(`Sending message to ${group.name} (${group.chat_id}) via GSA`);
             
-            // เตรียมข้อมูลสำหรับส่งไปยัง GSA
-            const payload = {
-              opt: 'sendToTelegram',
-              data: JSON.stringify({
-                message: message,
-                chatId: group.chat_id,
-                token: token,
-                lat: lat,
-                lon: lon
-              })
+            // สร้าง JSON string สำหรับข้อมูลที่ต้องการส่ง
+            const jsonData = {
+              message: message,
+              chatId: group.chat_id,
+              token: token
             };
             
-            // ส่งข้อมูลไปยัง GSA ด้วย HTTP POST
-            const response = await axios.post(gasUrl, null, {
-              params: payload
-            });
+            // เพิ่มพิกัดถ้ามี
+            if (lat && lon) {
+              jsonData.lat = lat;
+              jsonData.lon = lon;
+            }
+            
+            // แปลง JSON เป็น URL-encoded string
+            const encodedData = encodeURIComponent(JSON.stringify(jsonData));
+            
+            // สร้าง URL พร้อมพารามิเตอร์
+            const urlWithParams = `${gasUrl}?opt=sendToTelegram&data=${encodedData}`;
+            
+            console.log('Sending request to GSA:', urlWithParams);
+            
+            // ใช้ axios.get แบบตรงๆ โดยส่ง URL ที่มีพารามิเตอร์แล้ว
+            const response = await axios.get(urlWithParams);
             
             console.log(`Message sent to ${group.name} via GSA successfully:`, response.data);
           } catch (error) {
             console.error(`Error sending message to ${group.name} via GSA:`, error.message);
+            console.error('Error details:', error.response?.data || error);
           }
         }
       }
@@ -652,7 +651,7 @@ app.post('/api/admin/test-gas', async (req, res) => {
       return res.json({ success: false, message: 'ไม่พบ URL ของ GSA กรุณาตั้งค่าก่อน' });
     }
     
-    const gasUrl = gasUrlResult.rows[0].setting_value;
+    const gasUrl = gasUrlResult.rows[0].setting_value.trim(); // เพิ่ม trim() เพื่อตัดช่องว่าง
     
     // ดึง token และ chat_id
     const tokenResult = await pool.query(
@@ -683,22 +682,29 @@ app.post('/api/admin/test-gas', async (req, res) => {
       return res.json({ success: false, message: 'ไม่พบกลุ่ม Telegram ที่เปิดใช้งาน' });
     }
     
-    // เตรียมข้อมูลสำหรับส่งไปยัง GSA
-    const payload = {
-      opt: 'sendToTelegram',
-      data: JSON.stringify({
-        message: message,
-        chatId: activeGroup.chat_id,
-        token: token,
-        lat: lat,
-        lon: lon
-      })
+    // ข้อมูลสำหรับส่งไปยัง GSA
+    const jsonData = {
+      message: message,
+      chatId: activeGroup.chat_id,
+      token: token
     };
     
-    // ส่งข้อมูลไปยัง GSA ด้วย HTTP POST
-    const response = await axios.post(gasUrl, null, {
-      params: payload
-    });
+    // เพิ่มพิกัดถ้ามี
+    if (lat && lon) {
+      jsonData.lat = lat;
+      jsonData.lon = lon;
+    }
+    
+    console.log('Sending test message to GSA:', JSON.stringify(jsonData));
+    
+    // แปลง JSON เป็น URL-encoded string และสร้าง URL พร้อมพารามิเตอร์
+    const encodedData = encodeURIComponent(JSON.stringify(jsonData));
+    const urlWithParams = `${gasUrl}?opt=sendToTelegram&data=${encodedData}`;
+    
+    console.log('Requesting URL:', urlWithParams);
+    
+    // ส่งข้อมูลไปยัง GSA ด้วย axios.get
+    const response = await axios.get(urlWithParams);
     
     console.log('Test message sent via GSA:', response.data);
     res.json({ 
@@ -708,13 +714,14 @@ app.post('/api/admin/test-gas', async (req, res) => {
     });
   } catch (error) {
     console.error('Error testing GAS:', error);
+    console.error('Error details:', error.response?.data || error);
     res.json({ 
       success: false, 
       message: 'เกิดข้อผิดพลาด: ' + error.message,
       error: error.response?.data || error.message
     });
   }
-});
+}
 
 // ปรับปรุงฟังก์ชัน initializeDatabase เพื่อเพิ่ม setting สำหรับ GAS URL
 async function initializeDatabase() {
