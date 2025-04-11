@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบลงเวลาออนไลน์ หน่วยงาน</title>
-  <link rel="icon"https://github.com/songphoh/time-tracker-app/blob/main/images/logo.png?raw=true" type="image/png">
+  <link rel="icon" href="https://github.com/songphoh/time-tracker-app/blob/main/images/logo_v1.png?raw=true" type="image/png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <!-- เรียกใช้ไฟล์ CSS ของเรา -->
@@ -20,24 +20,25 @@
 </head>
 
 <body>
-  <div class="wrapper text-center" style="max-width:400px">
+  <div class="wrapper text-center" style="max-width:350px">
     <div class="site-logo text-center"></div>
     <h5>ระบบลงเวลาออนไลน์ หน่วยงาน</h5>
-  
+
     <span id="MyClockDisplay" class="clock mt-3" onload="showTime()"></span>
-  
+
     <form id="myForm">
-      <div class="row">
+
+      <div class="row mt-4">
         <div class="form-group col">
-          <label for="employee" class="form-label"><i>👤</i> พิมพ์ชื่อหรือรหัส</label>
-          <input id="employee" class="form-control" placeholder="พิมพ์ชื่อหรือรหัสพนักงาน">
+          <label for="employee">พิมพ์ชื่อหรือรหัส </label>
+          <input id="employee" class="text-center"> <br>
         </div>
       </div>
-  
-      <div class="row">
+
+      <div class="row mt-4">
         <div class="form-group col">
-          <label for="userinfo" class="form-label"><i>📝</i> หมายเหตุ: ประชุม/กิจกรรม อื่นๆ</label>
-          <input type="search" class="form-control" id="userinfo" name="userinfo" placeholder="เลือกหรือพิมพ์หมายเหตุ" list="list">
+          <label for="lblinfo"><i class="fas fa-book-reader"></i> หมายเหตุ:ประชุม/กิจกรรม อื่นๆ</label>
+          <input type="search" class="form-control form-control-lg" id="userinfo" name="userinfo" list="list">
           <datalist id="list">
             <option value="ไปราชการ">ไปราชการ</option>
             <option value="ลากิจ">ลากิจ</option>
@@ -46,17 +47,18 @@
           </datalist>
         </div>
       </div>
-  
-      <div class="clock-buttons" style="display: flex; gap: 10px; width: 100%; margin: 15px 0;">
-        <button class="btn btn-primary" style="flex: 1;">🕓 Clock In</button>
-        <button class="btn btn-warning" style="flex: 1;">🕓 Clock Out</button>
+
+      <div class="clock-buttons" style="display: flex; gap: 15px; width: 100%; margin: 25px 0;">
+        <button id="clockin" type="button" class="btn btn-primary" style="flex: 1;">🕓 Clock In</button>
+        <button id="clockout" type="button" class="btn btn-warning" style="flex: 1;">🕓 Clock Out</button>
       </div>
-  
+
       <div class="row mt-4">
         <div class="form-group col">
           <div class="alert" role="alert" id="message"></div>
         </div>
       </div>
+
     </form>
   </div>
   
