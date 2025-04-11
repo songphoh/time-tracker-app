@@ -483,7 +483,6 @@ app.post('/api/sendnotify', async (req, res) => {
 });
 
 // เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
-// เพิ่มฟังก์ชันสำหรับส่งข้อความไปยังทุกกลุ่ม Telegram ที่เปิดใช้งาน
 async function sendTelegramToAllGroups(message, lat, lon) {
   try {
     // ดึง token
@@ -513,35 +512,25 @@ async function sendTelegramToAllGroups(message, lat, lon) {
     try {
       const groups = JSON.parse(groupsResult.rows[0].setting_value);
       
+      // เตรียมข้อความ
+      let notifyMessage = message;
+      if (lat && lon) {
+        notifyMessage += `\nพิกัด: https://www.google.com/maps?q=${lat},${lon}`;
+      }
+      
       // ส่งข้อความไปยังแต่ละกลุ่มที่เปิดใช้งาน
       for (const group of groups) {
         if (group.active && group.chat_id) {
           try {
             console.log(`Sending Telegram message to ${group.name} (${group.chat_id})`);
             
-            // 1. ส่งข้อความปกติก่อน
             await axios.post(
               `https://api.telegram.org/bot${token}/sendMessage`,
               {
                 chat_id: group.chat_id,
-                text: message,
-                parse_mode: "Markdown"
+                text: notifyMessage
               }
             );
-            
-            // 2. ถ้ามีพิกัด ให้ส่งตำแหน่งแผนที่ (Telegram จะสร้างภาพแผนที่ให้อัตโนมัติ)
-            if (lat && lon) {
-              await axios.post(
-                `https://api.telegram.org/bot${token}/sendLocation`,
-                {
-                  chat_id: group.chat_id,
-                  latitude: parseFloat(lat),
-                  longitude: parseFloat(lon),
-                  // เพิ่มค่า live_period หากต้องการส่งตำแหน่งแบบ live location
-                  // live_period: 3600 // ส่งตำแหน่งแบบ live (อัพเดทได้) นาน 1 ชั่วโมง
-                }
-              );
-            }
             
             console.log(`Message sent to ${group.name} successfully`);
           } catch (error) {
