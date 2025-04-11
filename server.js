@@ -630,28 +630,43 @@ app.post('/api/admin/set-gas-url', async (req, res) => {
   }
 });
 
-// เพิ่ม API endpoint สำหรับทดสอบการส่งข้อความผ่าน GSA
+// API - ทดสอบการส่งข้อความผ่าน GSA
 app.post('/api/admin/test-gas', async (req, res) => {
   console.log('API: admin/test-gas - ทดสอบการส่งข้อความผ่าน GSA', req.body);
   
   try {
-    const { message, lat, lon } = req.body;
+    const { message, lat, lon, gasUrl } = req.body;
     
     if (!message) {
       return res.json({ success: false, message: 'กรุณาระบุข้อความ' });
     }
     
-    // ดึง URL ของ GSA
-    const gasUrlResult = await pool.query(
-      'SELECT setting_value FROM settings WHERE setting_name = $1',
-      ['gas_web_app_url']
-    );
+    // ใช้ URL ที่ส่งมาจากฟอร์มถ้ามี ถ้าไม่มีให้ดึงจากฐานข้อมูล
+    let useGasUrl = gasUrl;
     
-    if (gasUrlResult.rows.length === 0 || !gasUrlResult.rows[0].setting_value) {
-      return res.json({ success: false, message: 'ไม่พบ URL ของ GSA กรุณาตั้งค่าก่อน' });
+    if (!useGasUrl) {
+      // ดึง URL ของ GSA จากฐานข้อมูล
+      const gasUrlResult = await pool.query(
+        'SELECT setting_value FROM settings WHERE setting_name = $1',
+        ['gas_web_app_url']
+      );
+      
+      if (gasUrlResult.rows.length === 0 || !gasUrlResult.rows[0].setting_value) {
+        return res.json({ success: false, message: 'ไม่พบ URL ของ GSA กรุณาตั้งค่าก่อน' });
+      }
+      
+      useGasUrl = gasUrlResult.rows[0].setting_value.trim();
+    } else {
+      // ตัดช่องว่างออก
+      useGasUrl = useGasUrl.trim();
     }
     
-    const gasUrl = gasUrlResult.rows[0].setting_value.trim(); // เพิ่ม trim() เพื่อตัดช่องว่าง
+    // ตรวจสอบว่า URL มีรูปแบบถูกต้องหรือไม่
+    if (!useGasUrl.startsWith('https://')) {
+      return res.json({ success: false, message: 'URL ของ GSA ต้องขึ้นต้นด้วย https://' });
+    }
+    
+    console.log('ใช้ URL GSA สำหรับทดสอบ:', useGasUrl);
     
     // ดึง token และ chat_id
     const tokenResult = await pool.query(
@@ -695,18 +710,18 @@ app.post('/api/admin/test-gas', async (req, res) => {
       jsonData.lon = lon;
     }
     
-    console.log('Sending test message to GSA:', JSON.stringify(jsonData));
+    console.log('ข้อมูลที่ส่งไป GSA:', JSON.stringify(jsonData));
     
     // แปลง JSON เป็น URL-encoded string และสร้าง URL พร้อมพารามิเตอร์
     const encodedData = encodeURIComponent(JSON.stringify(jsonData));
-    const urlWithParams = `${gasUrl}?opt=sendToTelegram&data=${encodedData}`;
+    const urlWithParams = `${useGasUrl}?opt=sendToTelegram&data=${encodedData}`;
     
-    console.log('Requesting URL:', urlWithParams);
+    console.log('URL ที่เรียก:', urlWithParams);
     
     // ส่งข้อมูลไปยัง GSA ด้วย axios.get
     const response = await axios.get(urlWithParams);
     
-    console.log('Test message sent via GSA:', response.data);
+    console.log('การตอบกลับจาก GSA:', response.data);
     res.json({ 
       success: true, 
       message: 'ส่งข้อความทดสอบเรียบร้อยแล้ว', 
