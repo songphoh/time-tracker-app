@@ -59,6 +59,11 @@
             </a>
           </li>
         </ul>
+        <li class="nav-item">
+          <a class="nav-link" href="/admin/data-cleanup.html">
+            <i class="fas fa-broom me-1"></i> จัดการข้อมูล
+          </a>
+        </li>
         <ul class="navbar-nav">
           <li class="nav-item">
             <a class="nav-link" href="#" id="logout-btn">
@@ -262,7 +267,7 @@
         </div>
         <div class="modal-body">
           <p>คุณต้องการลบพนักงาน <span id="deleteEmployeeName" class="fw-bold"></span> ใช่หรือไม่?</p>
-          <p class="text-danger small">หมายเหตุ: การลบพนักงานจะเปลี่ยนสถานะเป็น "ไม่ใช้งาน" แต่ยังคงข้อมูลไว้ในระบบ</p>
+          <p class="text-danger small">หมายเหตุ: การลบพนักงานจะลบข้อมูลออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
@@ -272,11 +277,6 @@
     </div>
   </div>
 
-  <div class="modal-body">
-    <p>คุณต้องการลบพนักงาน <span id="deleteEmployeeName" class="fw-bold"></span> ใช่หรือไม่?</p>
-    <p class="text-danger small">หมายเหตุ: การลบพนักงานจะลบข้อมูลออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้</p>
-  </div>
-  
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <!-- Bootstrap JS -->
