@@ -1843,6 +1843,373 @@ app.post('/api/admin/import-employees', async (req, res) => {
   }
 });
 
+// API - เคลียร์ข้อมูลประวัติการลงเวลาตามช่วงเวลา
+app.post('/api/admin/cleanup-time-logs', async (req, res) => {
+  console.log('API: admin/cleanup-time-logs - เคลียร์ข้อมูลประวัติการลงเวลา', req.body);
+  
+  try {
+    const { date_before, employee_id, export_before_delete, cleanup_type } = req.body;
+    
+    if (!date_before && !cleanup_type) {
+      return res.json({ success: false, message: 'กรุณาระบุข้อมูลสำหรับการลบ เช่น วันที่หรือประเภทการลบ' });
+    }
+    
+    let query = 'SELECT t.id, t.employee_id, e.emp_code, e.full_name, t.clock_in, t.clock_out, t.note, t.status FROM time_logs t JOIN employees e ON t.employee_id = e.id WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    // เงื่อนไขตามช่วงเวลา
+    if (date_before) {
+      query += ` AND DATE(t.clock_in) < $${paramIndex++}`;
+      params.push(date_before);
+    }
+    
+    // เงื่อนไขตามพนักงาน
+    if (employee_id) {
+      query += ` AND t.employee_id = $${paramIndex++}`;
+      params.push(employee_id);
+    }
+    
+    // เงื่อนไขตามประเภทการลบ
+    if (cleanup_type === 'last_month') {
+      // ลบข้อมูลเดือนที่แล้ว
+      const lastMonthDate = new Date();
+      lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+      const firstDayLastMonth = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth(), 1);
+      const lastDayLastMonth = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth() + 1, 0);
+      
+      query += ` AND DATE(t.clock_in) >= $${paramIndex++} AND DATE(t.clock_in) <= $${paramIndex++}`;
+      params.push(firstDayLastMonth.toISOString().split('T')[0]);
+      params.push(lastDayLastMonth.toISOString().split('T')[0]);
+      
+    } else if (cleanup_type === 'last_year') {
+      // ลบข้อมูลปีที่แล้ว
+      const lastYearDate = new Date();
+      lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
+      const firstDayLastYear = new Date(lastYearDate.getFullYear(), 0, 1);
+      const lastDayLastYear = new Date(lastYearDate.getFullYear(), 11, 31);
+      
+      query += ` AND DATE(t.clock_in) >= $${paramIndex++} AND DATE(t.clock_in) <= $${paramIndex++}`;
+      params.push(firstDayLastYear.toISOString().split('T')[0]);
+      params.push(lastDayLastYear.toISOString().split('T')[0]);
+      
+    } else if (cleanup_type === 'older_than_6_months') {
+      // ลบข้อมูลเก่ากว่า 6 เดือน
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      query += ` AND DATE(t.clock_in) < $${paramIndex++}`;
+      params.push(sixMonthsAgo.toISOString().split('T')[0]);
+      
+    } else if (cleanup_type === 'older_than_1_year') {
+      // ลบข้อมูลเก่ากว่า 1 ปี
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      
+      query += ` AND DATE(t.clock_in) < $${paramIndex++}`;
+      params.push(oneYearAgo.toISOString().split('T')[0]);
+    }
+    
+    query += ' ORDER BY t.clock_in DESC';
+    
+    // ดึงข้อมูลที่จะลบ
+    const dataToDelete = await pool.query(query, params);
+    
+    // ถ้าไม่มีข้อมูลที่ตรงเงื่อนไข
+    if (dataToDelete.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลที่ตรงตามเงื่อนไข' });
+    }
+    
+    // ส่งออกข้อมูลก่อนลบถ้าต้องการ
+    let exportData = null;
+    if (export_before_delete) {
+      exportData = dataToDelete.rows.map(row => {
+        const clockInDate = new Date(new Date(row.clock_in).getTime() + (7 * 60 * 60 * 1000));
+        const clockOutDate = row.clock_out ? new Date(new Date(row.clock_out).getTime() + (7 * 60 * 60 * 1000)) : null;
+        
+        return {
+          emp_code: row.emp_code,
+          full_name: row.full_name,
+          clock_in_date: clockInDate.toLocaleDateString('th-TH'),
+          clock_in_time: clockInDate.toLocaleTimeString('th-TH'),
+          clock_out_date: clockOutDate ? clockOutDate.toLocaleDateString('th-TH') : '',
+          clock_out_time: clockOutDate ? clockOutDate.toLocaleTimeString('th-TH') : '',
+          note: row.note || '',
+          status: row.status
+        };
+      });
+    }
+    
+    // ลบข้อมูล
+    const idsToDelete = dataToDelete.rows.map(row => row.id);
+    
+    // ใช้ IN clause สำหรับการลบ (สำหรับข้อมูลจำนวนมาก ควรแบ่งชุดละไม่เกิน 1000 รายการ)
+    const batchSize = 1000;
+    const totalRecords = idsToDelete.length;
+    let deletedCount = 0;
+    
+    for (let i = 0; i < totalRecords; i += batchSize) {
+      const batch = idsToDelete.slice(i, i + batchSize);
+      
+      // สร้าง placeholders สำหรับ IN clause
+      const placeholders = batch.map((_, idx) => `$${idx + 1}`).join(', ');
+      
+      // ลบข้อมูลในแต่ละชุด
+      const deleteResult = await pool.query(
+        `DELETE FROM time_logs WHERE id IN (${placeholders})`,
+        batch
+      );
+      
+      deletedCount += deleteResult.rowCount;
+    }
+    
+    console.log(`ลบข้อมูลทั้งหมด ${deletedCount} รายการ`);
+    
+    // ส่งผลลัพธ์กลับ
+    res.json({
+      success: true,
+      message: `ลบข้อมูลเรียบร้อยแล้ว ${deletedCount} รายการ`,
+      deleted_count: deletedCount,
+      export_data: exportData
+    });
+    
+  } catch (error) {
+    console.error('Error cleaning up time logs:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ล้างข้อมูลพนักงานที่ไม่ได้ใช้งาน
+app.post('/api/admin/cleanup-inactive-employees', async (req, res) => {
+  console.log('API: admin/cleanup-inactive-employees - ล้างข้อมูลพนักงานที่ไม่ได้ใช้งาน', req.body);
+  
+  try {
+    const { include_logs, export_before_delete } = req.body;
+    
+    // ค้นหาพนักงานที่มีสถานะไม่ใช้งาน
+    const inactiveEmployees = await pool.query(
+      'SELECT id, emp_code, full_name FROM employees WHERE status = $1',
+      ['inactive']
+    );
+    
+    if (inactiveEmployees.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบพนักงานที่มีสถานะไม่ใช้งาน' });
+    }
+    
+    // ส่งออกข้อมูลก่อนลบถ้าต้องการ
+    let exportData = null;
+    if (export_before_delete) {
+      exportData = {
+        employees: inactiveEmployees.rows.map(emp => ({
+          id: emp.id,
+          emp_code: emp.emp_code,
+          full_name: emp.full_name
+        }))
+      };
+      
+      // ถ้าต้องการส่งออกข้อมูลการลงเวลาด้วย
+      if (include_logs) {
+        const employeeIds = inactiveEmployees.rows.map(emp => emp.id);
+        const placeholders = employeeIds.map((_, idx) => `$${idx + 1}`).join(', ');
+        
+        const timeLogs = await pool.query(
+          `SELECT t.id, t.employee_id, e.emp_code, e.full_name, t.clock_in, t.clock_out, t.note 
+           FROM time_logs t 
+           JOIN employees e ON t.employee_id = e.id 
+           WHERE t.employee_id IN (${placeholders})
+           ORDER BY t.clock_in DESC`,
+          employeeIds
+        );
+        
+        exportData.time_logs = timeLogs.rows.map(log => {
+          const clockInDate = new Date(new Date(log.clock_in).getTime() + (7 * 60 * 60 * 1000));
+          const clockOutDate = log.clock_out ? new Date(new Date(log.clock_out).getTime() + (7 * 60 * 60 * 1000)) : null;
+          
+          return {
+            id: log.id,
+            emp_code: log.emp_code,
+            full_name: log.full_name,
+            clock_in_date: clockInDate.toLocaleDateString('th-TH'),
+            clock_in_time: clockInDate.toLocaleTimeString('th-TH'),
+            clock_out_date: clockOutDate ? clockOutDate.toLocaleDateString('th-TH') : '',
+            clock_out_time: clockOutDate ? clockOutDate.toLocaleTimeString('th-TH') : '',
+            note: log.note || ''
+          };
+        });
+      }
+    }
+    
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      let deletedLogCount = 0;
+      
+      // ลบข้อมูลการลงเวลาของพนักงานที่ไม่ใช้งานถ้าต้องการ
+      if (include_logs) {
+        const employeeIds = inactiveEmployees.rows.map(emp => emp.id);
+        
+        // แบ่งเป็นชุดเพื่อป้องกันปัญหากับข้อมูลจำนวนมาก
+        const batchSize = 100;
+        
+        for (let i = 0; i < employeeIds.length; i += batchSize) {
+          const batchIds = employeeIds.slice(i, i + batchSize);
+          const placeholders = batchIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          
+          const deleteLogsResult = await client.query(
+            `DELETE FROM time_logs WHERE employee_id IN (${placeholders})`,
+            batchIds
+          );
+          
+          deletedLogCount += deleteLogsResult.rowCount;
+        }
+      }
+      
+      // ลบข้อมูลพนักงานที่ไม่ใช้งาน
+      const employeeIds = inactiveEmployees.rows.map(emp => emp.id);
+      const placeholders = employeeIds.map((_, idx) => `$${idx + 1}`).join(', ');
+      
+      const deleteEmployeesResult = await client.query(
+        `DELETE FROM employees WHERE id IN (${placeholders})`,
+        employeeIds
+      );
+      
+      await client.query('COMMIT');
+      
+      console.log(`ลบพนักงานทั้งหมด ${deleteEmployeesResult.rowCount} คน และข้อมูลการลงเวลา ${deletedLogCount} รายการ`);
+      
+      // ส่งผลลัพธ์กลับ
+      res.json({
+        success: true,
+        message: `ลบพนักงานเรียบร้อยแล้ว ${deleteEmployeesResult.rowCount} คน และข้อมูลการลงเวลา ${deletedLogCount} รายการ`,
+        deleted_employees: deleteEmployeesResult.rowCount,
+        deleted_logs: deletedLogCount,
+        export_data: exportData
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error cleaning up inactive employees:', error);
+      res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+    } finally {
+      client.release();
+    }
+    
+  } catch (error) {
+    console.error('Error cleaning up inactive employees:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - สำรองข้อมูลไฟล์ฐานข้อมูล (สำหรับระบบ PostgreSQL บน Render.com ควรใช้วิธีสำรองผ่าน dashboard ของ Render)
+app.get('/api/admin/backup-database', async (req, res) => {
+  console.log('API: admin/backup-database - สำรองข้อมูลฐานข้อมูล');
+  
+  try {
+    // ดึงข้อมูลทั้งหมดจากตาราง employees และ time_logs
+    const employeesResult = await pool.query('SELECT * FROM employees ORDER BY id');
+    const timeLogsResult = await pool.query('SELECT * FROM time_logs ORDER BY id');
+    const settingsResult = await pool.query('SELECT * FROM settings ORDER BY id');
+    
+    // สร้าง object ข้อมูลสำรอง
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      employees: employeesResult.rows,
+      time_logs: timeLogsResult.rows,
+      settings: settingsResult.rows.filter(s => s.setting_name !== 'admin_password') // ไม่รวมรหัสผ่านในข้อมูลสำรอง
+    };
+    
+    // แปลงเป็น JSON
+    const backupJSON = JSON.stringify(backupData, null, 2);
+    
+    // ส่งไฟล์ JSON กลับไปยังผู้ใช้
+    res.setHeader('Content-Disposition', `attachment; filename=time_tracker_backup_${new Date().toISOString().split('T')[0]}.json`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(backupJSON);
+    
+  } catch (error) {
+    console.error('Error backing up database:', error);
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ส่งออกข้อมูลการลงเวลาเป็น CSV
+app.post('/api/admin/export-time-logs', async (req, res) => {
+  console.log('API: admin/export-time-logs - ส่งออกข้อมูลการลงเวลา', req.body);
+  
+  try {
+    const { from_date, to_date, employee_id, format } = req.body;
+    
+    let query = `
+      SELECT e.emp_code, e.full_name, e.position, e.department, 
+             t.clock_in, t.clock_out, t.note, t.status,
+             t.latitude_in, t.longitude_in, t.latitude_out, t.longitude_out
+      FROM time_logs t
+      JOIN employees e ON t.employee_id = e.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramIndex = 1;
+    
+    if (from_date) {
+      query += ` AND DATE(t.clock_in) >= $${paramIndex++}`;
+      params.push(from_date);
+    }
+    
+    if (to_date) {
+      query += ` AND DATE(t.clock_in) <= $${paramIndex++}`;
+      params.push(to_date);
+    }
+    
+    if (employee_id) {
+      query += ` AND t.employee_id = $${paramIndex++}`;
+      params.push(employee_id);
+    }
+    
+    query += ' ORDER BY t.clock_in DESC';
+    
+    const result = await pool.query(query, params);
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลที่ตรงตามเงื่อนไข' });
+    }
+    
+    // ปรับรูปแบบข้อมูลให้อ่านง่าย
+    const formattedLogs = result.rows.map(log => {
+      const clockInDate = new Date(new Date(log.clock_in).getTime() + (7 * 60 * 60 * 1000));
+      const clockOutDate = log.clock_out ? new Date(new Date(log.clock_out).getTime() + (7 * 60 * 60 * 1000)) : null;
+      
+      return {
+        "รหัสพนักงาน": log.emp_code,
+        "ชื่อ-นามสกุล": log.full_name,
+        "ตำแหน่ง": log.position || '',
+        "แผนก": log.department || '',
+        "วันที่เข้างาน": clockInDate.toLocaleDateString('th-TH'),
+        "เวลาเข้างาน": clockInDate.toLocaleTimeString('th-TH'),
+        "วันที่ออกงาน": clockOutDate ? clockOutDate.toLocaleDateString('th-TH') : '',
+        "เวลาออกงาน": clockOutDate ? clockOutDate.toLocaleTimeString('th-TH') : '',
+        "หมายเหตุ": log.note || '',
+        "สถานะ": log.status,
+        "พิกัดเข้า": log.latitude_in && log.longitude_in ? `${log.latitude_in}, ${log.longitude_in}` : '',
+        "พิกัดออก": log.latitude_out && log.longitude_out ? `${log.latitude_out}, ${log.longitude_out}` : ''
+      };
+    });
+    
+    // ส่งข้อมูลกลับในรูปแบบที่ต้องการ
+    res.json({
+      success: true,
+      data: formattedLogs,
+      count: formattedLogs.length
+    });
+    
+  } catch (error) {
+    console.error('Error exporting time logs:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
 // เริ่มเซิร์ฟเวอร์
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
