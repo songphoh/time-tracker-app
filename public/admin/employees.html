@@ -776,8 +776,14 @@
         // แสดงผลการนำเข้า
         showImportResult(result);
         
-        // โหลดข้อมูลพนักงานใหม่
-        loadEmployees();
+        // รีเฟรชหน้าเว็บ
+        if (result.success) {
+          setTimeout(function() {
+            window.location.reload(); // รีเฟรชหน้าเว็บ
+          }, 2000); // รอ 2 วินาทีเพื่อให้ผู้ใช้ได้เห็นผลลัพธ์
+        }
+
+        
       } catch (error) {
         console.error('Error importing employees:', error);
         alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ' + error.message);
