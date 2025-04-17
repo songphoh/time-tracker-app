@@ -2210,6 +2210,53 @@ app.post('/api/admin/export-time-logs', async (req, res) => {
   }
 });
 
+// API - ลบพนักงานทั้งหมด
+app.post('/api/admin/delete-all-employees', async (req, res) => {
+  console.log('API: admin/delete-all-employees - ลบพนักงานทั้งหมด', req.body);
+  
+  try {
+    const { confirm } = req.body;
+    
+    if (!confirm) {
+      return res.json({ success: false, message: 'ต้องยืนยันการลบข้อมูล' });
+    }
+    
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // ลบข้อมูลการลงเวลาทั้งหมดก่อน เนื่องจากมี foreign key
+      const deleteLogsResult = await client.query('DELETE FROM time_logs');
+      
+      // ลบข้อมูลพนักงานทั้งหมด
+      const deleteEmployeesResult = await client.query('DELETE FROM employees');
+      
+      await client.query('COMMIT');
+      
+      console.log(`ลบพนักงานทั้งหมด ${deleteEmployeesResult.rowCount} คน และข้อมูลการลงเวลา ${deleteLogsResult.rowCount} รายการ`);
+      
+      res.json({
+        success: true,
+        message: 'ลบพนักงานทั้งหมดเรียบร้อยแล้ว',
+        deleted_count: deleteEmployeesResult.rowCount,
+        deleted_logs: deleteLogsResult.rowCount
+      });
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error deleting all employees:', error);
+      res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+    } finally {
+      client.release();
+    }
+    
+  } catch (error) {
+    console.error('Error deleting all employees:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
 // เริ่มเซิร์ฟเวอร์
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
