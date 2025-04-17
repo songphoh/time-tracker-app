@@ -87,6 +87,9 @@
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
         <i class="fas fa-plus me-1"></i> เพิ่มพนักงาน
       </button>
+      <button class="btn btn-danger ms-2" id="deleteAllBtn">
+        <i class="fas fa-trash me-1"></i> ลบพนักงานทั้งหมด
+      </button>
     </div>
   </div>
 
@@ -272,6 +275,33 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="button" class="btn btn-danger" id="confirmDeleteBtn">ลบ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal ยืนยันการลบพนักงานทั้งหมด -->
+  <div class="modal fade" id="deleteAllModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">ยืนยันการลบพนักงานทั้งหมด</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i> คำเตือน
+          </div>
+          <p>คุณกำลังจะลบพนักงานทั้งหมดออกจากระบบ การกระทำนี้ไม่สามารถเรียกคืนได้</p>
+          <p>พนักงานทั้งหมด <span id="totalEmployeeCount" class="fw-bold">0</span> คน จะถูกลบออกจากระบบ</p>
+          <p>กรุณาพิมพ์คำว่า <span class="fw-bold text-danger">"ยืนยันการลบ"</span> ในช่องด้านล่างเพื่อยืนยันการลบข้อมูล</p>
+          <div class="mb-3">
+            <input type="text" class="form-control" id="deleteConfirmText" placeholder="ยืนยันการลบ">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-danger" id="confirmDeleteAllBtn" disabled>ลบทั้งหมด</button>
         </div>
       </div>
     </div>
@@ -466,7 +496,8 @@
                 alert('เกิดข้อผิดพลาด: ' + response.message);
               }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+              console.error('Error:', xhr, status, error);
               alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
             }
           });
@@ -488,7 +519,8 @@
                 alert('เกิดข้อผิดพลาด: ' + response.message);
               }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+              console.error('Error:', xhr, status, error);
               alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
             }
           });
@@ -526,6 +558,75 @@
         $('#department').val('');
         $('#status').val('active');
         $('#modalTitle').text('เพิ่มพนักงาน');
+      }
+
+      // เมื่อคลิกปุ่มลบพนักงานทั้งหมด
+      $('#deleteAllBtn').on('click', function() {
+        // อัปเดตจำนวนพนักงานทั้งหมด
+        $('#totalEmployeeCount').text(employeesTable.data().length);
+        
+        // ล้างข้อความในช่องยืนยัน
+        $('#deleteConfirmText').val('');
+        $('#confirmDeleteAllBtn').prop('disabled', true);
+        
+        // แสดง Modal ยืนยันการลบทั้งหมด
+        const modal = new bootstrap.Modal(document.getElementById('deleteAllModal'));
+        modal.show();
+      });
+
+      // ตรวจสอบข้อความยืนยันการลบทั้งหมด
+      $('#deleteConfirmText').on('input', function() {
+        const confirmText = $(this).val();
+        $('#confirmDeleteAllBtn').prop('disabled', confirmText !== 'ยืนยันการลบ');
+      });
+
+      // เมื่อคลิกปุ่มยืนยันการลบทั้งหมด
+      $('#confirmDeleteAllBtn').on('click', function() {
+        if ($('#deleteConfirmText').val() === 'ยืนยันการลบ') {
+          deleteAllEmployees();
+        }
+      });
+
+      // ฟังก์ชันลบพนักงานทั้งหมด
+      function deleteAllEmployees() {
+        // แสดงข้อความกำลังประมวลผล
+        const confirmBtn = $('#confirmDeleteAllBtn');
+        const originalText = confirmBtn.text();
+        confirmBtn.text('กำลังลบข้อมูล...').prop('disabled', true);
+        
+        // สร้าง API สำหรับลบพนักงานทั้งหมด
+        $.ajax({
+          url: '/api/admin/delete-all-employees',
+          type: 'POST',
+          data: JSON.stringify({
+            confirm: true
+          }),
+          contentType: 'application/json',
+          success: function(response) {
+            // ซ่อน Modal
+            $('#deleteAllModal').modal('hide');
+            
+            if (response.success) {
+              // ล้างข้อมูลในตาราง
+              employeesTable.clear().draw();
+              alert(`ลบพนักงานทั้งหมดเรียบร้อยแล้ว จำนวน ${response.deleted_count} คน`);
+            } else {
+              alert('เกิดข้อผิดพลาด: ' + response.message);
+            }
+            
+            // คืนค่าปุ่มกลับ
+            confirmBtn.text(originalText).prop('disabled', false);
+          },
+          error: function(xhr, status, error) {
+            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: ' + error);
+            
+            // คืนค่าปุ่มกลับ
+            confirmBtn.text(originalText).prop('disabled', false);
+            
+            // ซ่อน Modal
+            $('#deleteAllModal').modal('hide');
+          }
+        });
       }
     });
 
@@ -783,7 +884,6 @@
           }, 2000); // รอ 2 วินาทีเพื่อให้ผู้ใช้ได้เห็นผลลัพธ์
         }
 
-        
       } catch (error) {
         console.error('Error importing employees:', error);
         alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ' + error.message);
