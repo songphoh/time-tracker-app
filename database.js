@@ -4,7 +4,7 @@ const fs = require('fs');
 
 // กำหนดค่า connection string สำหรับ PostgreSQL
 // ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'https://console.aiven.io/account/a535aa5298e5/project/nammunla1996-5f87/services/pg-3c45e39d/overview';
+const connectionString = process.env.DATABASE_URL || 'Database connection string not provided';
 
 // สร้าง connection pool
 /*const pool = new Pool({
