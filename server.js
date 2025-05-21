@@ -22,13 +22,19 @@ app.use('/debug', debugRouter);
 
 // กำหนดค่า connection string สำหรับ PostgreSQL
 // ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_7ryl_user:vr1BkKP7mZqhcbpaKwKIwAn6JT5GuJ7I@dpg-cvr26i6uk2gs73c5u7g0-a.oregon-postgres.render.com/time_tracker_7ryl';
+const connectionString = process.env.DATABASE_URL || 'https://console.aiven.io/account/a535aa5298e5/project/nammunla1996-5f87/services/pg-3c45e39d/overview';
 
 // สร้าง connection pool
-const pool = new Pool({
+/*const pool = new Pool({
   connectionString,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
+});*/
+
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false }, // อาจต้องปรับตามความเหมาะสม
+  timezone: 'Asia/Bangkok'
 });
 
 // ทดสอบการเชื่อมต่อ
