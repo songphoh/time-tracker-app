@@ -18,21 +18,16 @@ debugRouter.get('/test-db', async (req, res) => {
   console.log('API: debug/test-db - ทดสอบการเชื่อมต่อฐานข้อมูล');
   
   try {
-    // ใช้ connection string เดียวกับในไฟล์ server.js
-    const connectionString = process.env.DATABASE_URL || 'Database connection string not provided';
+    // ใช้ connection string จาก environment variable
+    const connectionString = process.env.DATABASE_URL;
     
     // สร้าง connection pool
-    /*const pool = new Pool({
-      connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
-    });*/
-    
     const pool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false }, // อาจต้องปรับตามความเหมาะสม
-    timezone: 'Asia/Bangkok'
-  });
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      timezone: 'Asia/Bangkok'
+    });
+    
     const result = await pool.query('SELECT NOW()');
     
     // ตรวจสอบตารางในฐานข้อมูล

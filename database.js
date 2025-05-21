@@ -2,20 +2,13 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
-// กำหนดค่า connection string สำหรับ PostgreSQL
-// ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'Database connection string not provided';
+// กำหนดค่า connection string สำหรับ PostgreSQL จาก environment variable
+const connectionString = process.env.DATABASE_URL;
 
 // สร้าง connection pool
-/*const pool = new Pool({
-  connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
-});*/
-
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false }, // อาจต้องปรับตามความเหมาะสม
+  ssl: { rejectUnauthorized: false },
   timezone: 'Asia/Bangkok'
 });
 

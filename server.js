@@ -1,3 +1,5 @@
+// เพิ่มด้านบนสุดของไฟล์
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -20,20 +22,14 @@ const port = process.env.PORT || 3000;
 const debugRouter = require('./debug');
 app.use('/debug', debugRouter);
 
-// กำหนดค่า connection string สำหรับ PostgreSQL
-// ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'Database connection string not provided';
+// กำหนดค่า connection string สำหรับ PostgreSQL จาก environment variable
+const connectionString = process.env.DATABASE_URL;
+console.log("DATABASE_URL environment variable:", process.env.DATABASE_URL ? "Set (value hidden for security)" : "NOT SET");
 
 // สร้าง connection pool
-/*const pool = new Pool({
-  connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
-});*/
-
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false }, // อาจต้องปรับตามความเหมาะสม
+  ssl: { rejectUnauthorized: false },
   timezone: 'Asia/Bangkok'
 });
 
