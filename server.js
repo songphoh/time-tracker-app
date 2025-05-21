@@ -26,10 +26,19 @@ app.use('/debug', debugRouter);
 const connectionString = process.env.DATABASE_URL;
 console.log("DATABASE_URL environment variable:", process.env.DATABASE_URL ? "Set (value hidden for security)" : "NOT SET");
 
+// ดึง CA certificate จากตัวแปรสภาพแวดล้อม
+const caCert = process.env.CA_CERT;
+console.log("CA_CERT environment variable:", process.env.CA_CERT ? "Set (value hidden for security)" : "NOT SET");
+
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false },
+  ssl: caCert ? {
+    ca: caCert,       // ใช้ CA certificate จากตัวแปรสภาพแวดล้อม
+    rejectUnauthorized: true  // เปิดการตรวจสอบ certificate
+  } : {
+    rejectUnauthorized: false // fallback ถ้าไม่มี CA certificate
+  },
   timezone: 'Asia/Bangkok'
 });
 

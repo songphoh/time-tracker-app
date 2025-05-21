@@ -20,14 +20,22 @@ debugRouter.get('/test-db', async (req, res) => {
   try {
     // ใช้ connection string จาก environment variable
     const connectionString = process.env.DATABASE_URL;
-    
+
+    // ดึง CA certificate จากตัวแปรสภาพแวดล้อม
+    const caCert = process.env.CA_CERT;
+
     // สร้าง connection pool
     const pool = new Pool({
       connectionString,
-      ssl: { rejectUnauthorized: false },
+      ssl: caCert ? {
+        ca: caCert,       // ใช้ CA certificate จากตัวแปรสภาพแวดล้อม
+        rejectUnauthorized: true  // เปิดการตรวจสอบ certificate
+      } : {
+        rejectUnauthorized: false // fallback ถ้าไม่มี CA certificate
+      },
       timezone: 'Asia/Bangkok'
     });
-    
+
     const result = await pool.query('SELECT NOW()');
     
     // ตรวจสอบตารางในฐานข้อมูล
