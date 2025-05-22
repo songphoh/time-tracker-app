@@ -18,24 +18,16 @@ debugRouter.get('/test-db', async (req, res) => {
   console.log('API: debug/test-db - ทดสอบการเชื่อมต่อฐานข้อมูล');
   
   try {
-    // ใช้ connection string จาก environment variable
-    const connectionString = process.env.DATABASE_URL;
-
-    // ดึง CA certificate จากตัวแปรสภาพแวดล้อม
-    const caCert = process.env.CA_CERT;
-
+    // ใช้ connection string เดียวกับในไฟล์ server.js
+    const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
+    
     // สร้าง connection pool
     const pool = new Pool({
       connectionString,
-      ssl: caCert ? {
-        ca: caCert,       // ใช้ CA certificate จากตัวแปรสภาพแวดล้อม
-        rejectUnauthorized: true  // เปิดการตรวจสอบ certificate
-      } : {
-        rejectUnauthorized: false // fallback ถ้าไม่มี CA certificate
-      },
-      timezone: 'Asia/Bangkok'
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
     });
-
+    
     const result = await pool.query('SELECT NOW()');
     
     // ตรวจสอบตารางในฐานข้อมูล
@@ -100,7 +92,7 @@ debugRouter.post('/test-clockin', async (req, res) => {
     };
     
     // เชื่อมต่อกับฐานข้อมูล
-    const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_7ryl_user:vr1BkKP7mZqhcbpaKwKIwAn6JT5GuJ7I@dpg-cvr26i6uk2gs73c5u7g0-a.oregon-postgres.render.com/time_tracker_7ryl';
+    const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
     
     const pool = new Pool({
       connectionString,
@@ -178,7 +170,7 @@ debugRouter.post('/update-liff', async (req, res) => {
     }
     
     // เชื่อมต่อกับฐานข้อมูล
-    const connectionString = process.env.DATABASE_URL || 'postgresql://time_tracker_7ryl_user:vr1BkKP7mZqhcbpaKwKIwAn6JT5GuJ7I@dpg-cvr26i6uk2gs73c5u7g0-a.oregon-postgres.render.com/time_tracker_7ryl';
+    const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
     
     const pool = new Pool({
       connectionString,

@@ -2,22 +2,15 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
-// กำหนดค่า connection string สำหรับ PostgreSQL จาก environment variable
-const connectionString = process.env.DATABASE_URL;
-
-// ดึง CA certificate จากตัวแปรสภาพแวดล้อม
-const caCert = process.env.CA_CERT;
+// กำหนดค่า connection string สำหรับ PostgreSQL
+// ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
+const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
 
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: caCert ? {
-    ca: caCert,       // ใช้ CA certificate จากตัวแปรสภาพแวดล้อม
-    rejectUnauthorized: true  // เปิดการตรวจสอบ certificate
-  } : {
-    rejectUnauthorized: false // fallback ถ้าไม่มี CA certificate
-  },
-  timezone: 'Asia/Bangkok'
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
 });
 
 // ฟังก์ชันสำหรับเช็คการเชื่อมต่อและเตรียมฐานข้อมูล
