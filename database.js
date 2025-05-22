@@ -9,8 +9,12 @@ const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
+  ssl: {
+    rejectUnauthorized: false,
+    checkServerIdentity: () => undefined
+  },
+  connectionTimeoutMillis: 15000,
+  timezone: 'Asia/Bangkok'
 });
 
 // ฟังก์ชันสำหรับเช็คการเชื่อมต่อและเตรียมฐานข้อมูล

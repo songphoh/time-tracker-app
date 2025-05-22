@@ -24,8 +24,12 @@ debugRouter.get('/test-db', async (req, res) => {
     // สร้าง connection pool
     const pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
+      ssl: {
+        rejectUnauthorized: false,
+        checkServerIdentity: () => undefined
+      },
+      connectionTimeoutMillis: 15000,
+      timezone: 'Asia/Bangkok'
     });
     
     const result = await pool.query('SELECT NOW()');
@@ -96,7 +100,12 @@ debugRouter.post('/test-clockin', async (req, res) => {
     
     const pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl: {
+        rejectUnauthorized: false,
+        checkServerIdentity: () => undefined
+      },
+      connectionTimeoutMillis: 15000,
+      timezone: 'Asia/Bangkok'
     });
     
     // ตรวจสอบว่ามีพนักงานในระบบหรือไม่
@@ -174,7 +183,12 @@ debugRouter.post('/update-liff', async (req, res) => {
     
     const pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl: {
+        rejectUnauthorized: false,
+        checkServerIdentity: () => undefined
+      },
+      connectionTimeoutMillis: 15000,
+      timezone: 'Asia/Bangkok'
     });
     
     // ตรวจสอบว่ามีการตั้งค่า liff_id หรือไม่

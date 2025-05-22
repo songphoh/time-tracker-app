@@ -1,3 +1,5 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -26,8 +28,12 @@ const connectionString =process.env.DATABASE_URL ||"postgres://avnadmin:AVNS_f55
 // สร้าง connection pool
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  timezone: 'Asia/Bangkok'  // เพิ่มการตั้งค่าโซนเวลา
+  ssl: {
+    rejectUnauthorized: false,
+    checkServerIdentity: () => undefined
+  },
+  connectionTimeoutMillis: 15000,
+  timezone: 'Asia/Bangkok'
 });
 
 // ทดสอบการเชื่อมต่อ
