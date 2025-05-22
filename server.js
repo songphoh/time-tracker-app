@@ -915,11 +915,11 @@ app.post('/api/admin/login', async (req, res) => {
     console.log(`Login attempt: ${username}`);
     
     // ตรวจสอบด้วยค่าเริ่มต้น admin/admin123 ก่อน
-    //if (username === 'admin' && password === 'admin123') {
-    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    if (username === 'admin' && password === 'admin123') {
+    //const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+    //const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
-    if (username === adminUsername && password === adminPassword) {
+    //if (username === adminUsername && password === adminPassword) {
       console.log('Admin login successful with default credentials');
       return res.json({ success: true });
     }

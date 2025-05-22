@@ -4,7 +4,8 @@ const fs = require('fs');
 
 // กำหนดค่า connection string สำหรับ PostgreSQL
 // ใช้ environment variables สำหรับการเชื่อมต่อ (สำคัญสำหรับการ deploy)
-const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
+//const connectionString = process.env.DATABASE_URL || 'postgres://avnadmin:AVNS_f55VsqPVus0il98ErN3@pg-3c45e39d-nammunla1996-5f87.j.aivencloud.com:27540/defaultdb?sslmode=require';
+const connectionString = process.env.DATABASE_URL || "postgresql://postgres.ofzfxbhzkvrumsgrgogq:%40Songphon544942@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
 
 // สร้าง connection pool
 const pool = new Pool({
