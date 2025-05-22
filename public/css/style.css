@@ -347,13 +347,13 @@ button, input[type="submit"], input[type="button"] {
 }
 
 /* ปุ่ม Clock In */
-button:nth-of-type(1), input[type="submit"]:nth-of-type(1), input[type="button"]:nth-of-type(1) {
-   background: linear-gradient(to right, hsl(240.92deg 50% 45%), #5c5fc0);
+#clockin {
+    background: linear-gradient(to right, hsl(240.92deg 50% 45%), #5c5fc0) !important;
 }
 
 /* ปุ่ม Clock Out */
-button:nth-of-type(2), input[type="submit"]:nth-of-type(2), input[type="button"]:nth-of-type(2) {
-  background: linear-gradient(to right, #f57c00, #ff9800);
+#clockout {
+    background: linear-gradient(to right, #f57c00, #ff9800) !important;
 }
 
 button:hover, input[type="submit"]:hover, input[type="button"]:hover {
