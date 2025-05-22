@@ -237,6 +237,13 @@ div#showtxt {
   overflow: hidden;
   transform: perspective(500px) rotateX(2deg);
   transition: all 0.3s ease;
+  /** กรอบนาฬิกา **/
+  padding: 5px 0px 5px 10px;
+  display: inline-block;
+  border: 3px solid #304b89;
+  border-radius: 2px;
+  outline-style: solid;
+  outline-color: #1a237e;
 }
 
 .clock:hover {
