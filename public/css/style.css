@@ -348,7 +348,7 @@ button, input[type="submit"], input[type="button"] {
 
 /* ปุ่ม Clock In */
 button:nth-of-type(1), input[type="submit"]:nth-of-type(1), input[type="button"]:nth-of-type(1) {
-  background: linear-gradient(to right, hsl(197, 50%, 45%), #5ca4c0);
+   background: linear-gradient(to right, hsl(240.92deg 50% 45%), #5c5fc0);
 }
 
 /* ปุ่ม Clock Out */
