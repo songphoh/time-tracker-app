@@ -332,7 +332,7 @@ body {
 
 /* ปุ่ม Clock In และ Clock Out */
 button, input[type="submit"], input[type="button"] {
-  padding: 12px 25px;
+  padding: 18px 25px;
   border-radius: 8px;
   border: none;
   font-family: 'Kanit', sans-serif;
