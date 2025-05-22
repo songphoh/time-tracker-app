@@ -17,6 +17,16 @@ body {
     padding-bottom: 2rem;
   }
   
+  .site-logo {
+  content: url("https://www.huana-nbp.go.th/index/add_file/P0D284NMon35557.png");
+  display: inline-block;
+  margin-top: 20px;
+  width: auto;
+  height: 100px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+  transition: transform 0.3s ease, filter 0.3s ease;
+  }
+
   /* แต่งการ์ด */
   .card {
     border: none;

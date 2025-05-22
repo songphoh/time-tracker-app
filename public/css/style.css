@@ -25,7 +25,7 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #6e5ed4, #7365cf, #8073e0, #9284f4);
+  background: linear-gradient(135deg, #3843dd, #659ccf, #73bde0, #84edf4);
   background-size: 400% 400%;
   animation: gradient 20s ease infinite;
   position: relative;
@@ -132,7 +132,7 @@ div#showtxt {
 }
 
 .site-logo {
-  content: url("https://raw.githubusercontent.com/songphoh/time-tracker-app/refs/heads/main/images/logo_v1.png");
+  content: url("https://www.huana-nbp.go.th/index/add_file/P0D284NMon35557.png");
   display: inline-block;
   margin-top: 20px;
   width: auto;
@@ -341,7 +341,7 @@ button, input[type="submit"], input[type="button"] {
 
 /* ปุ่ม Clock In */
 button:nth-of-type(1), input[type="submit"]:nth-of-type(1), input[type="button"]:nth-of-type(1) {
-  background: linear-gradient(to right, #3949ab, #5c6bc0);
+  background: linear-gradient(to right, hsl(197, 50%, 45%), #5ca4c0);
 }
 
 /* ปุ่ม Clock Out */

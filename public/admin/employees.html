@@ -5,7 +5,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>จัดการพนักงาน - ระบบลงเวลาออนไลน์</title>
-  
+  <link rel="icon" href="https://www.huana-nbp.go.th/index/add_file/P0D284NMon35557.png" type="image/png">
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome -->
@@ -379,22 +379,43 @@
       // เมื่อคลิกปุ่มแก้ไข
       $('#employeesTable').on('click', '.edit-btn', function() {
         const id = $(this).data('id');
-        const data = employeesTable.row($(this).closest('tr')).data();
         
-        // กำหนดข้อมูลในฟอร์ม
-        $('#employeeId').val(data.id);
-        $('#empCode').val(data.emp_code);
-        $('#fullName').val(data.full_name);
-        $('#position').val(data.position || '');
-        $('#department').val(data.department || '');
-        $('#status').val(data.status);
-        
-        // เปลี่ยนหัวข้อ Modal
-        $('#modalTitle').text('แก้ไขพนักงาน');
-        
-        // แสดง Modal
+        // แสดง loading
         const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
         modal.show();
+        
+        // ล้างฟอร์มก่อน
+        resetForm();
+        $('#modalTitle').text('กำลังโหลดข้อมูล...');
+        
+        // เรียก API เพื่อดึงข้อมูลล่าสุด
+        $.ajax({
+          url: '/api/admin/employees/' + id,
+          type: 'GET',
+          success: function(response) {
+            if (response.success) {
+              const data = response.employee;
+              
+              // กำหนดข้อมูลในฟอร์ม
+              $('#employeeId').val(data.id);
+              $('#empCode').val(data.emp_code);
+              $('#fullName').val(data.full_name);
+              $('#position').val(data.position || '');
+              $('#department').val(data.department || '');
+              $('#status').val(data.status);
+              
+              // เปลี่ยนหัวข้อ Modal
+              $('#modalTitle').text('แก้ไขพนักงาน');
+            } else {
+              alert('เกิดข้อผิดพลาด: ' + response.message);
+              modal.hide();
+            }
+          },
+          error: function() {
+            alert('ไม่สามารถดึงข้อมูลพนักงานได้');
+            modal.hide();
+          }
+        });
       });
       
       // เมื่อคลิกปุ่มลบ
@@ -456,8 +477,13 @@
         });
       }
       
-      // ฟังก์ชันบันทึกข้อมูลพนักงาน
+      let isProcessing = false;
+
+      // ปรับปรุงฟังก์ชัน saveEmployee ให้มี loading
       function saveEmployee() {
+        // ป้องกันการกดซ้ำ
+        if (isProcessing) return;
+        
         // ตรวจสอบข้อมูลที่จำเป็น
         const empCode = $('#empCode').val().trim();
         const fullName = $('#fullName').val().trim();
@@ -466,6 +492,14 @@
           alert('กรุณากรอกรหัสและชื่อพนักงาน');
           return;
         }
+        
+        // เริ่มการประมวลผล
+        isProcessing = true; // ⭐ จุดนี้ที่ขาดไป!
+        
+        // แสดง loading
+        const saveBtn = $('#saveBtn');
+        const originalText = saveBtn.text();
+        saveBtn.text('กำลังบันทึก...').prop('disabled', true);
         
         // เตรียมข้อมูล
         const employeeData = {
@@ -487,9 +521,7 @@
             contentType: 'application/json',
             success: function(response) {
               if (response.success) {
-                // ซ่อน Modal
                 $('#employeeModal').modal('hide');
-                // โหลดข้อมูลใหม่
                 loadEmployees();
                 alert('บันทึกข้อมูลเรียบร้อย');
               } else {
@@ -499,6 +531,11 @@
             error: function(xhr, status, error) {
               console.error('Error:', xhr, status, error);
               alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            },
+            complete: function() {
+              // คืนค่าปุ่มและรีเซ็ตสถานะ
+              isProcessing = false; // ⭐ รีเซ็ตสถานะ
+              saveBtn.text(originalText).prop('disabled', false);
             }
           });
         } else {
@@ -510,9 +547,7 @@
             contentType: 'application/json',
             success: function(response) {
               if (response.success) {
-                // ซ่อน Modal
                 $('#employeeModal').modal('hide');
-                // โหลดข้อมูลใหม่
                 loadEmployees();
                 alert('เพิ่มพนักงานเรียบร้อย');
               } else {
@@ -522,21 +557,28 @@
             error: function(xhr, status, error) {
               console.error('Error:', xhr, status, error);
               alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            },
+            complete: function() {
+              // คืนค่าปุ่มและรีเซ็ตสถานะ
+              isProcessing = false; // ⭐ รีเซ็ตสถานะ
+              saveBtn.text(originalText).prop('disabled', false);
             }
           });
         }
       }
       
-      // ฟังก์ชันลบพนักงาน
+      // ฟังก์ชันลบพนักงาน - เพิ่ม loading
       function deleteEmployee(id) {
+        const confirmBtn = $('#confirmDeleteBtn');
+        const originalText = confirmBtn.text();
+        confirmBtn.text('กำลังลบ...').prop('disabled', true);
+        
         $.ajax({
           url: '/api/admin/employees/' + id,
           type: 'DELETE',
           success: function(response) {
             if (response.success) {
-              // ซ่อน Modal
               $('#deleteModal').modal('hide');
-              // โหลดข้อมูลใหม่
               loadEmployees();
               alert('ลบพนักงานเรียบร้อย');
             } else {
@@ -545,6 +587,10 @@
           },
           error: function() {
             alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+          },
+          complete: function() {
+            // คืนค่าปุ่ม
+            confirmBtn.text(originalText).prop('disabled', false);
           }
         });
       }

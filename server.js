@@ -1024,6 +1024,71 @@ function calculateDuration(startDate, endDate) {
   return `${hours} ชั่วโมง ${minutes} นาที`;
 }
 
+function processAdminDateTime(timeString) {
+  if (!timeString) return null;
+  
+  console.log('🕐 Processing admin time input:', timeString);
+  
+  try {
+    let resultDate;
+    
+    // กรณี datetime-local จาก HTML input (YYYY-MM-DDTHH:MM)
+    if (timeString.includes('T') && timeString.length === 16) {
+      // เพิ่ม :00 สำหรับวินาที
+      const fullDateTime = timeString + ':00';
+      console.log('📝 Full datetime string:', fullDateTime);
+      
+      // สร้าง Date object โดยถือว่าเป็นเวลาท้องถิ่น
+      resultDate = new Date(fullDateTime);
+      
+      // ตรวจสอบว่า Date object ถูกต้องหรือไม่
+      if (isNaN(resultDate.getTime())) {
+        throw new Error('Invalid date object created');
+      }
+      
+      console.log('📅 Local date object:', resultDate.toString());
+      console.log('🌍 Local time (Thai assumed):', resultDate.toLocaleString('th-TH'));
+      
+      // แปลงเป็น UTC โดยลบ 7 ชั่วโมง
+      const utcDate = new Date(resultDate.getTime() - (7 * 60 * 60 * 1000));
+      console.log('🌐 UTC date object:', utcDate.toString());
+      console.log('📤 Final UTC ISO:', utcDate.toISOString());
+      
+      return utcDate.toISOString();
+    }
+    
+    // กรณีที่มี timezone info แล้ว
+    if (timeString.includes('Z') || timeString.includes('+') || timeString.includes('-')) {
+      resultDate = new Date(timeString);
+      if (isNaN(resultDate.getTime())) {
+        throw new Error('Invalid date with timezone info');
+      }
+      console.log('✅ Already has timezone info, using as-is:', resultDate.toISOString());
+      return resultDate.toISOString();
+    }
+    
+    // กรณีอื่นๆ - ลองแปลงโดยตรง
+    resultDate = new Date(timeString);
+    if (isNaN(resultDate.getTime())) {
+      throw new Error('Cannot parse date string: ' + timeString);
+    }
+    
+    // สมมติว่าเป็นเวลาไทยและแปลงเป็น UTC
+    const utcDate = new Date(resultDate.getTime() - (7 * 60 * 60 * 1000));
+    console.log('🔄 General conversion to UTC:', utcDate.toISOString());
+    return utcDate.toISOString();
+    
+  } catch (error) {
+    console.error('❌ Error processing time:', error.message);
+    console.error('📋 Input was:', timeString);
+    
+    // Fallback: ใช้เวลาปัจจุบัน
+    const fallbackTime = new Date().toISOString();
+    console.log('🆘 Using fallback time (current time):', fallbackTime);
+    return fallbackTime;
+  }
+}
+
 // API - ดึงข้อมูลพนักงานทั้งหมด
 app.get('/api/admin/employees', async (req, res) => {
   console.log('API: admin/employees - ดึงข้อมูลพนักงานทั้งหมด');
@@ -1045,88 +1110,167 @@ app.get('/api/admin/employees', async (req, res) => {
 });
 
 // API - เพิ่มพนักงานใหม่
-app.post('/api/admin/employees', async (req, res) => {
-  console.log('API: admin/employees POST - เพิ่มพนักงานใหม่', req.body);
+app.post('/api/admin/time-logs', async (req, res) => {
+  console.log('API: admin/time-logs POST - เพิ่มข้อมูลการลงเวลาใหม่', req.body);
   
   try {
-    const { emp_code, full_name, position, department, status } = req.body;
+    const { employee_id, clock_in, clock_out, note, skip_notification } = req.body;
     
-    // ตรวจสอบข้อมูลที่จำเป็น
-    if (!emp_code || !full_name) {
-      return res.json({ success: false, message: 'กรุณาระบุรหัสและชื่อพนักงาน' });
+    if (!employee_id || !clock_in) {
+      return res.json({ success: false, message: 'กรุณาระบุข้อมูลที่จำเป็น' });
     }
     
-    // ตรวจสอบว่ารหัสพนักงานซ้ำหรือไม่
-    const existingResult = await pool.query(
-      'SELECT id FROM employees WHERE emp_code = $1',
-      [emp_code]
-    );
+    // ตรวจสอบว่ามีพนักงานนี้ในระบบหรือไม่
+    const empResult = await pool.query('SELECT id, full_name FROM employees WHERE id = $1', [employee_id]);
     
-    if (existingResult.rows.length > 0) {
-      return res.json({ success: false, message: 'รหัสพนักงานนี้มีในระบบแล้ว' });
+    if (empResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
     }
     
-    // เพิ่มพนักงานใหม่
-    const result = await pool.query(
-      `INSERT INTO employees (emp_code, full_name, position, department, status)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id`,
-      [emp_code, full_name, position || null, department || null, status || 'active']
-    );
+    const employee = empResult.rows[0];
     
-    console.log('Added new employee:', full_name, 'with ID:', result.rows[0].id);
-    res.json({ success: true, message: 'เพิ่มพนักงานเรียบร้อยแล้ว', id: result.rows[0].id });
+    console.log('🚀 Starting time processing...');
+    
+    // แปลงเวลาโดยใช้ฟังก์ชันใหม่
+    const adjustedClockIn = processAdminDateTime(clock_in);
+    const adjustedClockOut = clock_out ? processAdminDateTime(clock_out) : null;
+    
+    console.log('✅ Time processing completed');
+    console.log('📊 Final times for database:');
+    console.log('   Clock In (UTC):', adjustedClockIn);
+    console.log('   Clock Out (UTC):', adjustedClockOut);
+    
+    // ทดสอบแปลงกลับเป็นเวลาไทยเพื่อแสดง
+    if (adjustedClockIn) {
+      const testDisplay = new Date(adjustedClockIn);
+      const thaiDisplay = new Date(testDisplay.getTime() + (7 * 60 * 60 * 1000));
+      console.log('🇹🇭 Will display as Thai time:', thaiDisplay.toLocaleString('th-TH'));
+    }
+    
+    // เพิ่มข้อมูลการลงเวลา
+    const insertQuery = `
+      INSERT INTO time_logs (employee_id, clock_in, clock_out, note, status)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `;
+    
+    const result = await pool.query(insertQuery, [
+      employee_id, 
+      adjustedClockIn, 
+      adjustedClockOut, 
+      note || null,
+      'manual'
+    ]);
+    
+    const newId = result.rows[0].id;
+    console.log(`✅ Added new time log with ID: ${newId}`);
+    
+    // ส่งแจ้งเตือนถ้าไม่ได้ข้ามการแจ้งเตือน
+    if (!skip_notification) {
+      try {
+        const notifySettingResult = await pool.query(
+          'SELECT setting_value FROM settings WHERE setting_name = $1',
+          ['notify_clock_in']
+        );
+        
+        if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
+          // ใช้เวลาไทยสำหรับการแจ้งเตือน
+          const clockInForNotify = new Date(adjustedClockIn);
+          const thaiTimeForNotify = new Date(clockInForNotify.getTime() + (7 * 60 * 60 * 1000));
+          
+          const thaiDate = thaiTimeForNotify.toLocaleDateString('th-TH');
+          const timeStr = thaiTimeForNotify.toLocaleTimeString('th-TH');
+          
+          let message =
+            `⏱ ลงเวลาเข้างาน (บันทึกโดยแอดมิน)\n` +
+            `👤 ชื่อ-นามสกุล: *${employee.full_name}*\n` +
+            `📅 วันที่: *${thaiDate}*\n` +
+            `🕒 เวลา: *${timeStr}*\n` +
+            (note ? `📝 หมายเหตุ: *${note}*\n` : "");
+          
+          await sendTelegramToAllGroups(message, null, null, employee.full_name);
+        }
+        
+        // การแจ้งเตือนสำหรับเวลาออก
+        if (adjustedClockOut) {
+          const notifyOutSettingResult = await pool.query(
+            'SELECT setting_value FROM settings WHERE setting_name = $1',
+            ['notify_clock_out']
+          );
+          
+          if (notifyOutSettingResult.rows.length > 0 && notifyOutSettingResult.rows[0].setting_value === '1') {
+            const clockOutForNotify = new Date(adjustedClockOut);
+            const thaiTimeForNotify = new Date(clockOutForNotify.getTime() + (7 * 60 * 60 * 1000));
+            
+            const thaiDate = thaiTimeForNotify.toLocaleDateString('th-TH');
+            const timeStr = thaiTimeForNotify.toLocaleTimeString('th-TH');
+            
+            let message =
+              `⏱ ลงเวลาออกงาน (บันทึกโดยแอดมิน)\n` +
+              `👤 ชื่อ-นามสกุล: *${employee.full_name}*\n` +
+              `📅 วันที่: *${thaiDate}*\n` +
+              `🕒 เวลา: *${timeStr}*\n`;
+            
+            await sendTelegramToAllGroups(message, null, null, employee.full_name);
+          }
+        }
+      } catch (notifyError) {
+        console.error('⚠️ Error sending notification:', notifyError.message);
+        // ไม่ให้ notification error ขัดขวางการบันทึกข้อมูล
+      }
+    }
+    
+    res.json({ success: true, message: 'เพิ่มข้อมูลการลงเวลาเรียบร้อยแล้ว', id: newId });
+    
   } catch (error) {
-    console.error('Error adding employee:', error);
+    console.error('❌ Error adding time log:', error);
+    console.error('📋 Stack trace:', error.stack);
     res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
   }
 });
 
 // API - แก้ไขข้อมูลพนักงาน
-app.put('/api/admin/employees/:id', async (req, res) => {
-  console.log('API: admin/employees PUT - แก้ไขข้อมูลพนักงาน', req.params, req.body);
+app.put('/api/admin/time-logs/:id', async (req, res) => {
+  console.log('API: admin/time-logs/:id PUT - แก้ไขข้อมูลการลงเวลา', req.params, req.body);
   
   try {
     const { id } = req.params;
-    const { emp_code, full_name, position, department, status } = req.body;
+    const { clock_in, clock_out, note } = req.body;
     
-    // ตรวจสอบข้อมูลที่จำเป็น
-    if (!emp_code || !full_name) {
-      return res.json({ success: false, message: 'กรุณาระบุรหัสและชื่อพนักงาน' });
+    // ตรวจสอบว่ามีรายการนี้ในฐานข้อมูลหรือไม่
+    const checkResult = await pool.query('SELECT id FROM time_logs WHERE id = $1', [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลการลงเวลา' });
     }
     
-    // ตรวจสอบว่าพนักงานมีในระบบหรือไม่
-    const employeeResult = await pool.query(
-      'SELECT id FROM employees WHERE id = $1',
-      [id]
-    );
+    console.log('🚀 Starting time processing for update...');
     
-    if (employeeResult.rows.length === 0) {
-      return res.json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
-    }
+    const adjustedClockIn = processAdminDateTime(clock_in);
+    const adjustedClockOut = clock_out ? processAdminDateTime(clock_out) : null;
     
-    // ตรวจสอบว่ารหัสพนักงานซ้ำหรือไม่ (ยกเว้นรหัสของพนักงานคนเดิม)
-    const existingResult = await pool.query(
-      'SELECT id FROM employees WHERE emp_code = $1 AND id != $2',
-      [emp_code, id]
-    );
+    console.log('✅ Time processing for update completed');
+    console.log('📊 Final times for database update:');
+    console.log('   Clock In (UTC):', adjustedClockIn);
+    console.log('   Clock Out (UTC):', adjustedClockOut);
     
-    if (existingResult.rows.length > 0) {
-      return res.json({ success: false, message: 'รหัสพนักงานนี้มีในระบบแล้ว' });
-    }
+    // แก้ไขข้อมูล
+    const updateQuery = `
+      UPDATE time_logs SET 
+      clock_in = $1, 
+      clock_out = $2, 
+      note = $3
+      WHERE id = $4
+    `;
     
-    // แก้ไขข้อมูลพนักงาน
-    await pool.query(
-      `UPDATE employees
-       SET emp_code = $1, full_name = $2, position = $3, department = $4, status = $5
-       WHERE id = $6`,
-      [emp_code, full_name, position || null, department || null, status || 'active', id]
-    );
+    await pool.query(updateQuery, [adjustedClockIn, adjustedClockOut, note, id]);
     
-    console.log('Updated employee:', full_name, 'with ID:', id);
-    res.json({ success: true, message: 'แก้ไขข้อมูลพนักงานเรียบร้อยแล้ว' });
+    console.log(`✅ Updated time log ID: ${id}`);
+    res.json({ success: true, message: 'แก้ไขข้อมูลการลงเวลาเรียบร้อยแล้ว' });
+    
   } catch (error) {
-    console.error('Error updating employee:', error);
+    console.error('❌ Error updating time log:', error);
+    console.error('📋 Stack trace:', error.stack);
     res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
   }
 });
@@ -1553,6 +1697,44 @@ app.put('/api/admin/time-logs/:id', async (req, res) => {
       return res.json({ success: false, message: 'ไม่พบข้อมูลการลงเวลา' });
     }
     
+    // ใช้ฟังก์ชันเดียวกันกับการเพิ่มข้อมูล
+    function processAdminDateTime(timeString) {
+      if (!timeString) return null;
+      
+      console.log('Processing admin edit time:', timeString);
+      
+      // datetime-local format จาก HTML input
+      if (timeString.includes('T') && !timeString.includes('Z') && !timeString.includes('+')) {
+        const localDateTime = timeString + ':00';
+        const localDate = new Date(localDateTime);
+        const utcDate = new Date(localDate.getTime() - (7 * 60 * 60 * 1000));
+        
+        console.log('Admin edit conversion:', timeString, '->', utcDate.toISOString());
+        return utcDate.toISOString();
+      }
+      
+      // มี timezone info แล้ว
+      if (timeString.includes('Z') || timeString.includes('+')) {
+        return new Date(timeString).toISOString();
+      }
+      
+      // กรณีอื่นๆ
+      const date = new Date(timeString);
+      const utcDate = new Date(date.getTime() - (7 * 60 * 60 * 1000));
+      return utcDate.toISOString();
+    }
+    
+    const adjustedClockIn = processAdminDateTime(clock_in);
+    const adjustedClockOut = clock_out ? processAdminDateTime(clock_out) : null;
+    
+    console.log('=== Admin Edit Time Processing ===');
+    console.log('Original times:', { clock_in, clock_out });
+    console.log('Processed times (UTC):', { 
+      clock_in: adjustedClockIn, 
+      clock_out: adjustedClockOut 
+    });
+    console.log('==================================');
+    
     // แก้ไขข้อมูล
     const updateQuery = `
       UPDATE time_logs SET 
@@ -1562,7 +1744,7 @@ app.put('/api/admin/time-logs/:id', async (req, res) => {
       WHERE id = $4
     `;
     
-    await pool.query(updateQuery, [clock_in, clock_out, note, id]);
+    await pool.query(updateQuery, [adjustedClockIn, adjustedClockOut, note, id]);
     
     console.log(`Updated time log ID: ${id}`);
     res.json({ success: true, message: 'แก้ไขข้อมูลการลงเวลาเรียบร้อยแล้ว' });
@@ -1592,6 +1774,65 @@ app.post('/api/admin/time-logs', async (req, res) => {
     
     const employee = empResult.rows[0];
     
+    // ฟังก์ชันสำหรับจัดการเวลาจากแอดมิน
+    function processAdminDateTime(timeString) {
+      if (!timeString) return null;
+      
+      console.log('Processing admin time input:', timeString);
+      
+      // ถ้าเป็น datetime-local format จาก HTML input (YYYY-MM-DDTHH:MM)
+      if (timeString.includes('T') && !timeString.includes('Z') && !timeString.includes('+')) {
+        // ถือว่าเป็นเวลาไทยที่ป้อนเข้ามา ไม่ต้องปรับ timezone
+        // แค่เพิ่ม :00 สำหรับวินาทีและแปลงเป็น UTC
+        const localDateTime = timeString + ':00'; // YYYY-MM-DDTHH:MM:SS
+        const localDate = new Date(localDateTime);
+        
+        // แปลงเป็น UTC โดยลบ 7 ชั่วโมง (เพราะไทยเป็น UTC+7)
+        const utcDate = new Date(localDate.getTime() - (7 * 60 * 60 * 1000));
+        
+        console.log('Admin input conversion:');
+        console.log('  Input:', timeString);
+        console.log('  Local with seconds:', localDateTime);
+        console.log('  Local Date object:', localDate.toString());
+        console.log('  UTC Date object:', utcDate.toString());
+        console.log('  Final UTC ISO:', utcDate.toISOString());
+        
+        return utcDate.toISOString();
+      }
+      
+      // ถ้ามี timezone info แล้ว ใช้ตามนั้น
+      if (timeString.includes('Z') || timeString.includes('+')) {
+        const result = new Date(timeString).toISOString();
+        console.log('Already has timezone info:', timeString, '->', result);
+        return result;
+      }
+      
+      // กรณีอื่นๆ ถือว่าเป็นเวลาไทยและแปลงเป็น UTC
+      const date = new Date(timeString);
+      const utcDate = new Date(date.getTime() - (7 * 60 * 60 * 1000));
+      console.log('Other format conversion:', timeString, '->', utcDate.toISOString());
+      return utcDate.toISOString();
+    }
+    
+    // แปลงเวลาให้เป็น UTC
+    const adjustedClockIn = processAdminDateTime(clock_in);
+    const adjustedClockOut = clock_out ? processAdminDateTime(clock_out) : null;
+    
+    console.log('=== Admin Time Processing ===');
+    console.log('Original clock_in:', clock_in);
+    console.log('Processed clock_in (UTC):', adjustedClockIn);
+    
+    if (clock_out) {
+      console.log('Original clock_out:', clock_out);
+      console.log('Processed clock_out (UTC):', adjustedClockOut);
+    }
+    
+    // ตรวจสอบผลลัพธ์การแปลงเวลา
+    const testThaiTime = new Date(adjustedClockIn);
+    const displayThaiTime = new Date(testThaiTime.getTime() + (7 * 60 * 60 * 1000));
+    console.log('Will display as Thai time:', displayThaiTime.toLocaleString('th-TH'));
+    console.log('==============================');
+    
     // เพิ่มข้อมูลการลงเวลา
     const insertQuery = `
       INSERT INTO time_logs (employee_id, clock_in, clock_out, note, status)
@@ -1601,33 +1842,34 @@ app.post('/api/admin/time-logs', async (req, res) => {
     
     const result = await pool.query(insertQuery, [
       employee_id, 
-      clock_in, 
-      clock_out || null, 
+      adjustedClockIn, 
+      adjustedClockOut, 
       note || null,
-      'manual' // เพิ่มสถานะ 'manual' เพื่อระบุว่าเป็นการเพิ่มด้วยแอดมิน
+      'manual' // สถานะ manual สำหรับข้อมูลที่เพิ่มโดยแอดมิน
     ]);
     
     const newId = result.rows[0].id;
     
     // ส่งแจ้งเตือนถ้าไม่ได้ข้ามการแจ้งเตือน
     if (!skip_notification) {
-      // ดึงการตั้งค่าการแจ้งเตือน
       const notifySettingResult = await pool.query(
         'SELECT setting_value FROM settings WHERE setting_name = $1',
         ['notify_clock_in']
       );
       
       if (notifySettingResult.rows.length > 0 && notifySettingResult.rows[0].setting_value === '1') {
-        // สร้างข้อความสำหรับส่งแจ้งเตือน
-        const clockInDate = new Date(new Date(clock_in).getTime() + (7 * 60 * 60 * 1000));
+        // ใช้เวลาไทยสำหรับการแจ้งเตือน
+        const clockInForNotify = new Date(adjustedClockIn);
+        const thaiTimeForNotify = new Date(clockInForNotify.getTime() + (7 * 60 * 60 * 1000));
+        
         const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
           weekday: 'long'
         });
-        const thaiDate = thaiFormatter.format(clockInDate);
-        const timeStr = clockInDate.toLocaleTimeString('th-TH');
+        const thaiDate = thaiFormatter.format(thaiTimeForNotify);
+        const timeStr = thaiTimeForNotify.toLocaleTimeString('th-TH');
         
         let message =
           `⏱ ลงเวลาเข้างาน (บันทึกโดยแอดมิน)\n` +
@@ -1641,23 +1883,24 @@ app.post('/api/admin/time-logs', async (req, res) => {
       }
       
       // ถ้ามีการลงเวลาออกด้วย
-      if (clock_out) {
+      if (adjustedClockOut) {
         const notifyOutSettingResult = await pool.query(
           'SELECT setting_value FROM settings WHERE setting_name = $1',
           ['notify_clock_out']
         );
         
         if (notifyOutSettingResult.rows.length > 0 && notifyOutSettingResult.rows[0].setting_value === '1') {
-          // สร้างข้อความสำหรับส่งแจ้งเตือน
-          const clockOutDate = new Date(new Date(clock_out).getTime() + (7 * 60 * 60 * 1000));
+          const clockOutForNotify = new Date(adjustedClockOut);
+          const thaiTimeForNotify = new Date(clockOutForNotify.getTime() + (7 * 60 * 60 * 1000));
+          
           const thaiFormatter = new Intl.DateTimeFormat('th-TH', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             weekday: 'long'
           });
-          const thaiDate = thaiFormatter.format(clockOutDate);
-          const timeStr = clockOutDate.toLocaleTimeString('th-TH');
+          const thaiDate = thaiFormatter.format(thaiTimeForNotify);
+          const timeStr = thaiTimeForNotify.toLocaleTimeString('th-TH');
           
           let message =
             `⏱ ลงเวลาออกงาน (บันทึกโดยแอดมิน)\n` +
@@ -2258,6 +2501,135 @@ app.post('/api/admin/delete-all-employees', async (req, res) => {
     
   } catch (error) {
     console.error('Error deleting all employees:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - ดึงข้อมูลพนักงานเฉพาะรายการ
+app.get('/api/admin/employees/:id', async (req, res) => {
+  console.log('API: admin/employees/:id - ดึงข้อมูลพนักงานเฉพาะรายการ', req.params);
+  
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT id, emp_code, full_name, position, department, 
+             line_id, line_name, status, created_at
+      FROM employees
+      WHERE id = $1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
+    }
+    
+    const employee = result.rows[0];
+    
+    res.json({ success: true, employee });
+  } catch (error) {
+    console.error('Error getting employee:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - แก้ไขข้อมูลพนักงาน
+app.put('/api/admin/employees/:id', async (req, res) => {
+  console.log('API: admin/employees/:id PUT - แก้ไขข้อมูลพนักงาน', req.params, req.body);
+  
+  try {
+    const { id } = req.params;
+    const { emp_code, full_name, position, department, status } = req.body;
+    
+    if (!emp_code || !full_name) {
+      return res.json({ success: false, message: 'กรุณาระบุรหัสพนักงานและชื่อ-นามสกุล' });
+    }
+    
+    // ตรวจสอบว่ามีพนักงานนี้ในระบบหรือไม่
+    const checkResult = await pool.query('SELECT id FROM employees WHERE id = $1', [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
+    }
+    
+    // ตรวจสอบว่ารหัสพนักงานซ้ำกับคนอื่นหรือไม่ (ยกเว้นตัวเอง)
+    const duplicateResult = await pool.query(
+      'SELECT id FROM employees WHERE emp_code = $1 AND id != $2',
+      [emp_code, id]
+    );
+    
+    if (duplicateResult.rows.length > 0) {
+      return res.json({ success: false, message: 'รหัสพนักงานนี้มีอยู่ในระบบแล้ว' });
+    }
+    
+    // แก้ไขข้อมูลพนักงาน
+    const updateQuery = `
+      UPDATE employees SET 
+      emp_code = $1, 
+      full_name = $2, 
+      position = $3, 
+      department = $4,
+      status = $5
+      WHERE id = $6
+    `;
+    
+    await pool.query(updateQuery, [
+      emp_code, 
+      full_name, 
+      position || null, 
+      department || null,
+      status || 'active',
+      id
+    ]);
+    
+    console.log(`แก้ไขข้อมูลพนักงาน ID: ${id} เรียบร้อยแล้ว`);
+    res.json({ success: true, message: 'แก้ไขข้อมูลพนักงานเรียบร้อยแล้ว' });
+    
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+});
+
+// API - เพิ่มพนักงานใหม่
+app.post('/api/admin/employees', async (req, res) => {
+  console.log('API: admin/employees POST - เพิ่มพนักงานใหม่', req.body);
+  
+  try {
+    const { emp_code, full_name, position, department } = req.body;
+    
+    if (!emp_code || !full_name) {
+      return res.json({ success: false, message: 'กรุณาระบุรหัสพนักงานและชื่อ-นามสกุล' });
+    }
+    
+    // ตรวจสอบว่ามีรหัสพนักงานซ้ำหรือไม่
+    const checkResult = await pool.query(
+      'SELECT id FROM employees WHERE emp_code = $1',
+      [emp_code]
+    );
+    
+    if (checkResult.rows.length > 0) {
+      return res.json({ success: false, message: 'รหัสพนักงานนี้มีอยู่ในระบบแล้ว' });
+    }
+    
+    // เพิ่มพนักงานใหม่
+    const insertResult = await pool.query(
+      `INSERT INTO employees (emp_code, full_name, position, department, status)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [emp_code, full_name, position || null, department || null, 'active']
+    );
+    
+    const newId = insertResult.rows[0].id;
+    
+    console.log(`เพิ่มพนักงานใหม่สำเร็จ ID: ${newId}`);
+    res.json({ 
+      success: true, 
+      message: 'เพิ่มพนักงานเรียบร้อยแล้ว',
+      id: newId
+    });
+    
+  } catch (error) {
+    console.error('Error adding employee:', error);
     res.json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
   }
 });
